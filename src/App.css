@@ -5,7 +5,49 @@
   --muted: #5e6f80;
   --line: #c8d3df;
   --brand: #1d5cbf;
+  --brand-text: #ffffff;
+  --field-bg: #ffffff;
+  --graph-bg: #fbfdff;
+  --node-fill: #f9fbff;
+  --node-selected: #fff4dc;
+  --node-text: #1b2941;
+  --tooltip-bg: #17222f;
+  --tooltip-text: #f3f7fc;
+  --bg-grad-1: #e7eef9;
+  --bg-grad-2: #edf2f8;
   --danger: #c43333;
+  --danger-border: #d7a8a8;
+  --secondary-bg: #eef4fc;
+  --secondary-text: #204271;
+  --secondary-border: #b9cbe4;
+  --secondary-active: #dce9fb;
+  --secondary-active-border: #7fa0d3;
+}
+
+:root[data-theme='turtle-night'] {
+  --bg: #081a2f;
+  --panel: #10263f;
+  --text: #f5f8ff;
+  --muted: #bdd0dc;
+  --line: #36516e;
+  --brand: #87a792;
+  --brand-text: #0e2236;
+  --field-bg: #132b47;
+  --graph-bg: #0d2239;
+  --node-fill: #16324f;
+  --node-selected: #214665;
+  --node-text: #f4fbff;
+  --tooltip-bg: #0f2033;
+  --tooltip-text: #f8fcff;
+  --bg-grad-1: #0f2e4b;
+  --bg-grad-2: #091e34;
+  --danger: #ffd3d3;
+  --danger-border: #8d5f5f;
+  --secondary-bg: #18324f;
+  --secondary-text: #f2f8ff;
+  --secondary-border: #4b6886;
+  --secondary-active: #25537c;
+  --secondary-active-border: #87a792;
 }
 
 * {
@@ -14,9 +56,9 @@
 
 body {
   margin: 0;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: 'Avenir Next', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   color: var(--text);
-  background: radial-gradient(circle at top right, #e7eef9 0%, var(--bg) 45%, #edf2f8 100%);
+  background: radial-gradient(circle at top right, var(--bg-grad-1) 0%, var(--bg) 45%, var(--bg-grad-2) 100%);
 }
 
 button,
@@ -32,34 +74,34 @@ textarea {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 8px 10px;
-  background: #fff;
+  background: var(--field-bg);
   color: var(--text);
 }
 
 button {
-  border: 1px solid #2d67be;
+  border: 1px solid var(--brand);
   background: var(--brand);
-  color: #fff;
+  color: var(--brand-text);
   padding: 8px 11px;
   border-radius: 8px;
   cursor: pointer;
 }
 
 button.secondary {
-  background: #eef4fc;
-  color: #204271;
-  border-color: #b9cbe4;
+  background: var(--secondary-bg);
+  color: var(--secondary-text);
+  border-color: var(--secondary-border);
 }
 
 button.secondary.active {
-  background: #dce9fb;
-  border-color: #7fa0d3;
+  background: var(--secondary-active);
+  border-color: var(--secondary-active-border);
 }
 
 button.danger {
-  background: #fff;
+  background: var(--field-bg);
   color: var(--danger);
-  border-color: #d7a8a8;
+  border-color: var(--danger-border);
 }
 
 .app {
@@ -109,6 +151,21 @@ button.danger {
   font-size: 1.35rem;
 }
 
+.main-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.theme-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
 .main-header p {
   margin: 7px 0 0;
   color: var(--muted);
@@ -116,7 +173,7 @@ button.danger {
 
 .graph-shell {
   position: relative;
-  background: #fbfdff;
+  background: var(--graph-bg);
   border: 1px solid var(--line);
   border-radius: 12px;
   overflow: hidden;
@@ -137,7 +194,7 @@ button.danger {
 }
 
 .node-text {
-  fill: #1b2941;
+  fill: var(--node-text);
   font-size: 10px;
   font-weight: 700;
   pointer-events: none;
@@ -147,8 +204,8 @@ button.danger {
   position: fixed;
   width: 290px;
   z-index: 100;
-  background: #17222f;
-  color: #f3f7fc;
+  background: var(--tooltip-bg);
+  color: var(--tooltip-text);
   border-radius: 10px;
   padding: 10px;
   font-size: 0.85rem;
@@ -235,8 +292,8 @@ button.danger {
 }
 
 .file-upload {
-  border: 1px solid #2d67be;
-  color: #fff;
+  border: 1px solid var(--brand);
+  color: var(--brand-text);
   background: var(--brand);
   border-radius: 8px;
   padding: 8px 11px;
@@ -278,7 +335,7 @@ button.danger {
   align-items: center;
   gap: 6px;
   font-size: 0.84rem;
-  background: #fff;
+  background: var(--field-bg);
 }
 
 .stat-list {
@@ -307,5 +364,10 @@ button.danger {
 
   .graph-shell svg {
     height: 56vh;
+  }
+
+  .main-header-top {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }

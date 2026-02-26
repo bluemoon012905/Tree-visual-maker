@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 
 type EdgeType = 'next' | 'previous' | 'undirected'
@@ -39,6 +39,8 @@ type PositionedNode = {
   x: number
   y: number
 }
+
+type ThemeMode = 'light' | 'turtle-night'
 
 const WIDTH = 980
 const HEIGHT = 680
@@ -293,6 +295,7 @@ function computeLayout(nodes: NodeData[], edges: EdgeData[]): PositionedNode[] {
 }
 
 function App() {
+  const [theme, setTheme] = useState<ThemeMode>('light')
   const [project, setProject] = useState<ProjectData>(SAMPLE_DATA)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(
     SAMPLE_DATA.nodes[0]?.id ?? null,
@@ -345,6 +348,10 @@ function App() {
   const positionedById = useMemo(() => new Map(positions.map((item) => [item.node.id, item])), [positions])
 
   const hoveredNode = hover ? nodesById.get(hover.nodeId) ?? null : null
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+  }, [theme])
 
   function addTag() {
     const trimmed = newTagName.trim()
@@ -718,7 +725,16 @@ function App() {
 
       <main className="main-area">
         <header className="main-header">
-          <h1>Skill Tree Visualizer</h1>
+          <div className="main-header-top">
+            <h1>Skill Tree Visualizer</h1>
+            <label className="theme-switcher">
+              Theme
+              <select value={theme} onChange={(event) => setTheme(event.target.value as ThemeMode)}>
+                <option value="light">Light</option>
+                <option value="turtle-night">Turtle's night</option>
+              </select>
+            </label>
+          </div>
           <p>
             Visible tags define filtered rendering. Nodes cluster by shared tags and connect through typed
             edges.
@@ -806,7 +822,7 @@ function App() {
                 >
                   <circle
                     r={22}
-                    fill={selectedNodeId === node.id ? '#fff4dc' : '#f9fbff'}
+                    fill={selectedNodeId === node.id ? 'var(--node-selected)' : 'var(--node-fill)'}
                     stroke={tags[0]?.color ?? '#5b6f8a'}
                     strokeWidth={selectedNodeId === node.id ? 4 : 3}
                     className="node-circle"

@@ -1,6 +1,6 @@
 # Tree Visual Maker
 
-Interactive skill tree / ability graph editor with tag-dimension clustering, typed node connections, metadata editing, and JSON import/export.
+Interactive skill tree / ability graph editor with tag-dimension clustering, typed node connections, metadata editing, and JSON import/export. 
 
 ## What Is Implemented
 

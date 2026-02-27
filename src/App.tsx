@@ -826,6 +826,9 @@ function App() {
   const [viewport, setViewport] = useState<ViewportState>({ scale: 1, tx: 0, ty: 0 })
   const [manualNodePositions, setManualNodePositions] = useState<Record<string, { x: number; y: number }>>({})
   const [project, setProject] = useState<ProjectData>(SAMPLE_DATA)
+  const [loadedProjectSnapshot, setLoadedProjectSnapshot] = useState(() =>
+    JSON.stringify(sortProjectForExport(SAMPLE_DATA)),
+  )
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [isNodeEditorOpen, setIsNodeEditorOpen] = useState(false)
   const [newTagName, setNewTagName] = useState('')
@@ -927,6 +930,11 @@ function App() {
     () => new Map(positions3D.map((item) => [item.node.id, item])),
     [positions3D],
   )
+  const currentProjectSnapshot = useMemo(
+    () => JSON.stringify(sortProjectForExport(project)),
+    [project],
+  )
+  const hasUnsavedProjectChanges = currentProjectSnapshot !== loadedProjectSnapshot
 
   const hoveredNode = hover ? nodesById.get(hover.nodeId) ?? null : null
   const svgRef = useRef<SVGSVGElement | null>(null)
@@ -1448,6 +1456,7 @@ function App() {
       const normalized = normalizeProject(parsed)
       setProject(normalized)
       setSelectedNodeId(normalized.nodes[0]?.id ?? null)
+      setLoadedProjectSnapshot(JSON.stringify(sortProjectForExport(normalized)))
       setManualNodePositions({})
       setViewport({ scale: 1, tx: 0, ty: 0 })
     } catch {
@@ -1455,8 +1464,19 @@ function App() {
     }
   }
 
+  function confirmDiscardIfEdited() {
+    if (!hasUnsavedProjectChanges) {
+      return true
+    }
+    return window.confirm("Are you sure? We save none of the progress if you haven't exported.")
+  }
+
   function loadExampleTemplate(template: ProjectData = SAMPLE_DATA) {
+    if (!confirmDiscardIfEdited()) {
+      return
+    }
     setProject(template)
+    setLoadedProjectSnapshot(JSON.stringify(sortProjectForExport(template)))
     setSelectedNodeId(null)
     setIsNodeEditorOpen(false)
     setShowRootNodesOnly(false)
@@ -1907,17 +1927,7 @@ function App() {
                 <button onClick={() => loadExampleTemplate(STARTER_TEMPLATE)}>
                   Load Starter Template
                 </button>
-                <button
-                  onClick={() => {
-                    const confirmed = window.confirm(
-                      "Are you sure? We save none of the progress if you haven't exported.",
-                    )
-                    if (!confirmed) {
-                      return
-                    }
-                    loadExampleTemplate(SAMPLE_DATA)
-                  }}
-                >
+                <button onClick={() => loadExampleTemplate(SAMPLE_DATA)}>
                   Reset to Sample
                 </button>
               </div>

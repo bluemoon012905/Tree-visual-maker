@@ -138,6 +138,10 @@ function edgeColor(type: EdgeType) {
   return '#6f7f90'
 }
 
+function isHexColor(value: string) {
+  return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value.trim())
+}
+
 function normalizeProject(input: ProjectData): ProjectData {
   const tags = (input.tags ?? []).map((tag) => ({
     id: String(tag.id ?? createId('tag')),
@@ -321,6 +325,7 @@ function App() {
   const [isNodeEditorOpen, setIsNodeEditorOpen] = useState(false)
   const [newTagName, setNewTagName] = useState('')
   const [newTagColor, setNewTagColor] = useState('#4577ff')
+  const [newTagColorHex, setNewTagColorHex] = useState('#4577ff')
   const [newEdgeTo, setNewEdgeTo] = useState('')
   const [newEdgeType, setNewEdgeType] = useState<EdgeType>('undirected')
   const [quantKey, setQuantKey] = useState('')
@@ -647,7 +652,25 @@ function App() {
                   className="color-input"
                   value={newTagColor}
                   type="color"
-                  onChange={(event) => setNewTagColor(event.target.value)}
+                  onChange={(event) => {
+                    setNewTagColor(event.target.value)
+                    setNewTagColorHex(event.target.value)
+                  }}
+                />
+                <input
+                  className="hex-input"
+                  value={newTagColorHex}
+                  onChange={(event) => setNewTagColorHex(event.target.value)}
+                  onBlur={() => {
+                    if (isHexColor(newTagColorHex)) {
+                      const normalized = newTagColorHex.trim().toLowerCase()
+                      setNewTagColor(normalized)
+                      setNewTagColorHex(normalized)
+                      return
+                    }
+                    setNewTagColorHex(newTagColor)
+                  }}
+                  placeholder="#4577ff"
                 />
                 <button onClick={addTag}>Add</button>
               </div>
@@ -671,6 +694,21 @@ function App() {
                       type="color"
                       value={tag.color}
                       onChange={(event) => updateTag(tag.id, { color: event.target.value })}
+                    />
+                    <input
+                      className="hex-input"
+                      key={`${tag.id}:${tag.color}`}
+                      defaultValue={tag.color}
+                      onBlur={(event) => {
+                        const value = event.target.value.trim().toLowerCase()
+                        if (!isHexColor(value)) {
+                          event.currentTarget.value = tag.color
+                          return
+                        }
+                        updateTag(tag.id, { color: value })
+                        event.currentTarget.value = value
+                      }}
+                      placeholder="#4577ff"
                     />
                     <button className="danger" onClick={() => deleteTag(tag.id)}>
                       Delete

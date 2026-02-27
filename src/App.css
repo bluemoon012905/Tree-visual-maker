@@ -283,6 +283,12 @@ button.danger {
   padding: 2px;
 }
 
+.hex-input {
+  min-width: 86px;
+  max-width: 98px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+}
+
 .checkbox {
   width: 16px;
   height: 16px;

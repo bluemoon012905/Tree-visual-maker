@@ -107,7 +107,7 @@ button.danger {
 .app {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: minmax(360px, 430px) 1fr;
+  grid-template-columns: minmax(320px, var(--sidebar-width, 430px)) 1fr;
   gap: 14px;
   padding: 14px;
 }

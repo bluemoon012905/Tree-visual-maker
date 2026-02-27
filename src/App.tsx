@@ -626,6 +626,7 @@ function project3D(x: number, y: number, z: number) {
 function App() {
   const [theme, setTheme] = useState<ThemeMode>('turtle-night')
   const [viewMode, setViewMode] = useState<ViewMode>('graph')
+  const [sidebarWidth, setSidebarWidth] = useState(430)
   const [project, setProject] = useState<ProjectData>(SAMPLE_DATA)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [isNodeEditorOpen, setIsNodeEditorOpen] = useState(false)
@@ -889,6 +890,17 @@ function App() {
     })
   }
 
+  function clearTagStats(tag: Tag) {
+    updateTag(tag.id, {
+      stats: {
+        quantitative: {},
+        qualitative: {},
+      },
+    })
+    setTagQuantDraft(tag.id, { key: '', value: '' })
+    setTagQualDraft(tag.id, { key: '', value: '' })
+  }
+
   function addStatStyle() {
     const trimmedKey = newStatKey.trim()
     if (!trimmedKey) {
@@ -1136,7 +1148,7 @@ function App() {
   }
 
   return (
-    <div className="app">
+    <div className="app" style={{ '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}>
       <aside className="sidebar">
         <section className="panel">
           <div className="panel-head">
@@ -1200,6 +1212,9 @@ function App() {
                         onChange={(event) => updateTag(tag.id, { statColor: event.target.value })}
                         title="Tag stats hover color"
                       />
+                      <button className="secondary" onClick={() => clearTagStats(tag)}>
+                        Clear Stats
+                      </button>
                       <button className="danger" onClick={() => deleteTag(tag.id)}>
                         Delete
                       </button>
@@ -1608,6 +1623,17 @@ function App() {
                 />
               </label>
             )}
+            <label className="theme-switcher">
+              Left Width
+              <input
+                type="range"
+                min={320}
+                max={620}
+                step={10}
+                value={sidebarWidth}
+                onChange={(event) => setSidebarWidth(Number(event.target.value))}
+              />
+            </label>
             <button onClick={addNode}>Add</button>
           </div>
         </section>

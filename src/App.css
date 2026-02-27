@@ -178,6 +178,12 @@ button.danger {
   gap: 10px;
 }
 
+.header-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .theme-switcher {
   display: inline-flex;
   align-items: center;
@@ -209,6 +215,10 @@ button.danger {
   display: block;
   width: 100%;
   height: min(68vh, 680px);
+}
+
+.list-view {
+  min-height: 300px;
 }
 
 .node-circle {
@@ -394,5 +404,10 @@ button.danger {
   .main-header-top {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .header-controls {
+    width: 100%;
+    flex-wrap: wrap;
   }
 }

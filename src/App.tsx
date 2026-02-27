@@ -41,7 +41,8 @@ type PositionedNode = {
 }
 
 type ThemeMode = 'light' | 'turtle-night'
-type CollapsibleSection = 'project' | 'tags' | 'nodes' | 'edges'
+type ViewMode = 'graph' | 'list'
+type CollapsibleSection = 'project' | 'tags' | 'edges'
 
 const WIDTH = 980
 const HEIGHT = 680
@@ -300,6 +301,7 @@ function computeLayout(nodes: NodeData[], edges: EdgeData[]): PositionedNode[] {
 
 function App() {
   const [theme, setTheme] = useState<ThemeMode>('turtle-night')
+  const [viewMode, setViewMode] = useState<ViewMode>('graph')
   const [project, setProject] = useState<ProjectData>(SAMPLE_DATA)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(
     SAMPLE_DATA.nodes[0]?.id ?? null,
@@ -318,7 +320,6 @@ function App() {
   const [collapsedSections, setCollapsedSections] = useState<Record<CollapsibleSection, boolean>>({
     project: false,
     tags: false,
-    nodes: false,
     edges: false,
   })
 
@@ -650,48 +651,6 @@ function App() {
 
         <section className="panel">
           <div className="panel-head">
-            <h2>Nodes</h2>
-            <button
-              className="secondary collapse-toggle"
-              onClick={() => toggleSection('nodes')}
-              aria-label={collapsedSections.nodes ? 'Expand nodes section' : 'Collapse nodes section'}
-            >
-              {collapsedSections.nodes ? '▾' : '▴'}
-            </button>
-          </div>
-          {!collapsedSections.nodes && (
-            <>
-              <div className="row">
-                <input
-                  value={newNodeName}
-                  onChange={(event) => setNewNodeName(event.target.value)}
-                  placeholder="New node name"
-                />
-                <button onClick={addNode}>Add</button>
-              </div>
-
-              <div className="list">
-                {project.nodes.map((node) => (
-                  <div className="list-item" key={node.id}>
-                    <button
-                      className={selectedNodeId === node.id ? 'secondary active' : 'secondary'}
-                      onClick={() => setSelectedNodeId(node.id)}
-                    >
-                      {node.name}
-                    </button>
-                    <button className="danger" onClick={() => deleteNode(node.id)}>
-                      Delete
-                    </button>
-                  </div>
-                ))}
-                {project.nodes.length === 0 && <p className="empty">No nodes yet.</p>}
-              </div>
-            </>
-          )}
-        </section>
-
-        <section className="panel">
-          <div className="panel-head">
             <h2>Edges</h2>
             <button
               className="secondary collapse-toggle"
@@ -764,13 +723,22 @@ function App() {
         <header className="main-header">
           <div className="main-header-top">
             <h1>Skill Tree Visualizer</h1>
-            <label className="theme-switcher">
-              Theme
-              <select value={theme} onChange={(event) => setTheme(event.target.value as ThemeMode)}>
-                <option value="light">Light</option>
-                <option value="turtle-night">Turtle's night</option>
-              </select>
-            </label>
+            <div className="header-controls">
+              <label className="theme-switcher">
+                Theme
+                <select value={theme} onChange={(event) => setTheme(event.target.value as ThemeMode)}>
+                  <option value="light">Light</option>
+                  <option value="turtle-night">Turtle's night</option>
+                </select>
+              </label>
+              <label className="theme-switcher">
+                View
+                <select value={viewMode} onChange={(event) => setViewMode(event.target.value as ViewMode)}>
+                  <option value="graph">Visual</option>
+                  <option value="list">List view</option>
+                </select>
+              </label>
+            </div>
           </div>
           <p>
             Visible tags define filtered rendering. Nodes cluster by shared tags and connect through typed
@@ -809,131 +777,164 @@ function App() {
           </section>
         </header>
 
-        <section className="graph-shell">
-          <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="Skill tree graph">
-            <defs>
-              <marker
-                id="arrow-next"
-                markerWidth="10"
-                markerHeight="8"
-                refX="8"
-                refY="4"
-                orient="auto"
-              >
-                <path d="M0,0 L10,4 L0,8 z" fill="#0c63e7" />
-              </marker>
-              <marker
-                id="arrow-previous"
-                markerWidth="10"
-                markerHeight="8"
-                refX="8"
-                refY="4"
-                orient="auto"
-              >
-                <path d="M0,0 L10,4 L0,8 z" fill="#b02f6b" />
-              </marker>
-            </defs>
-
-            {visibleEdges.map((edge) => {
-              const from = positionedById.get(edge.from)
-              const to = positionedById.get(edge.to)
-              if (!from || !to) {
-                return null
-              }
-
-              return (
-                <line
-                  key={edge.id}
-                  x1={from.x}
-                  y1={from.y}
-                  x2={to.x}
-                  y2={to.y}
-                  stroke={edgeColor(edge.type)}
-                  strokeWidth={2.3}
-                  strokeDasharray={edge.type === 'undirected' ? '7 5' : undefined}
-                  markerEnd={
-                    edge.type === 'next'
-                      ? 'url(#arrow-next)'
-                      : edge.type === 'previous'
-                        ? 'url(#arrow-previous)'
-                        : undefined
-                  }
-                />
-              )
-            })}
-
-            {positions.map(({ node, x, y }) => {
-              const tags = node.tagIds
-                .map((id) => tagById.get(id))
-                .filter((tag): tag is Tag => Boolean(tag))
-
-              return (
-                <g
-                  key={node.id}
-                  transform={`translate(${x}, ${y})`}
-                  onMouseMove={(event) =>
-                    setHover({
-                      nodeId: node.id,
-                      x: event.clientX,
-                      y: event.clientY,
-                    })
-                  }
-                  onMouseEnter={(event) =>
-                    setHover({
-                      nodeId: node.id,
-                      x: event.clientX,
-                      y: event.clientY,
-                    })
-                  }
-                  onMouseLeave={() => setHover((current) => (current?.nodeId === node.id ? null : current))}
-                  onClick={() => setSelectedNodeId(node.id)}
+        {viewMode === 'graph' ? (
+          <section className="graph-shell">
+            <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="Skill tree graph">
+              <defs>
+                <marker
+                  id="arrow-next"
+                  markerWidth="10"
+                  markerHeight="8"
+                  refX="8"
+                  refY="4"
+                  orient="auto"
                 >
-                  <circle
-                    r={NODE_RADIUS}
-                    fill={selectedNodeId === node.id ? 'var(--node-selected)' : 'var(--node-fill)'}
-                    stroke={tags[0]?.color ?? '#5b6f8a'}
-                    strokeWidth={selectedNodeId === node.id ? 4 : 3}
-                    className="node-circle"
-                  />
-                  <text
-                    className="node-text"
-                    textAnchor="middle"
-                    y={NODE_TEXT_Y}
-                    style={{ fontSize: `${NODE_FONT_SIZE}px` }}
-                  >
-                    {node.name.slice(0, 13)}
-                  </text>
-                </g>
-              )
-            })}
-          </svg>
+                  <path d="M0,0 L10,4 L0,8 z" fill="#0c63e7" />
+                </marker>
+                <marker
+                  id="arrow-previous"
+                  markerWidth="10"
+                  markerHeight="8"
+                  refX="8"
+                  refY="4"
+                  orient="auto"
+                >
+                  <path d="M0,0 L10,4 L0,8 z" fill="#b02f6b" />
+                </marker>
+              </defs>
 
-          {hoveredNode && hover && (
-            <div className="tooltip" style={{ left: hover.x + 14, top: hover.y + 14 }}>
-              <h3>{hoveredNode.name}</h3>
-              <p>{hoveredNode.description || 'No description.'}</p>
-              <p>
-                <strong>Tags:</strong>{' '}
-                {hoveredNode.tagIds
-                  .map((id) => tagById.get(id)?.name)
-                  .filter(Boolean)
-                  .join(', ') || 'None'}
-              </p>
-              <p>
-                <strong>Quant:</strong>{' '}
-                {Object.entries(hoveredNode.stats.quantitative)
-                  .map(([k, v]) => `${k}: ${v}`)
-                  .join(', ') || 'None'}
-              </p>
-              <p>
-                <strong>Qual:</strong>{' '}
-                {Object.entries(hoveredNode.stats.qualitative)
-                  .map(([k, v]) => `${k}: ${v}`)
-                  .join(', ') || 'None'}
-              </p>
+              {visibleEdges.map((edge) => {
+                const from = positionedById.get(edge.from)
+                const to = positionedById.get(edge.to)
+                if (!from || !to) {
+                  return null
+                }
+
+                return (
+                  <line
+                    key={edge.id}
+                    x1={from.x}
+                    y1={from.y}
+                    x2={to.x}
+                    y2={to.y}
+                    stroke={edgeColor(edge.type)}
+                    strokeWidth={2.3}
+                    strokeDasharray={edge.type === 'undirected' ? '7 5' : undefined}
+                    markerEnd={
+                      edge.type === 'next'
+                        ? 'url(#arrow-next)'
+                        : edge.type === 'previous'
+                          ? 'url(#arrow-previous)'
+                          : undefined
+                    }
+                  />
+                )
+              })}
+
+              {positions.map(({ node, x, y }) => {
+                const tags = node.tagIds
+                  .map((id) => tagById.get(id))
+                  .filter((tag): tag is Tag => Boolean(tag))
+
+                return (
+                  <g
+                    key={node.id}
+                    transform={`translate(${x}, ${y})`}
+                    onMouseMove={(event) =>
+                      setHover({
+                        nodeId: node.id,
+                        x: event.clientX,
+                        y: event.clientY,
+                      })
+                    }
+                    onMouseEnter={(event) =>
+                      setHover({
+                        nodeId: node.id,
+                        x: event.clientX,
+                        y: event.clientY,
+                      })
+                    }
+                    onMouseLeave={() =>
+                      setHover((current) => (current?.nodeId === node.id ? null : current))
+                    }
+                    onClick={() => setSelectedNodeId(node.id)}
+                  >
+                    <circle
+                      r={NODE_RADIUS}
+                      fill={selectedNodeId === node.id ? 'var(--node-selected)' : 'var(--node-fill)'}
+                      stroke={tags[0]?.color ?? '#5b6f8a'}
+                      strokeWidth={selectedNodeId === node.id ? 4 : 3}
+                      className="node-circle"
+                    />
+                    <text
+                      className="node-text"
+                      textAnchor="middle"
+                      y={NODE_TEXT_Y}
+                      style={{ fontSize: `${NODE_FONT_SIZE}px` }}
+                    >
+                      {node.name.slice(0, 13)}
+                    </text>
+                  </g>
+                )
+              })}
+            </svg>
+
+            {hoveredNode && hover && (
+              <div className="tooltip" style={{ left: hover.x + 14, top: hover.y + 14 }}>
+                <h3>{hoveredNode.name}</h3>
+                <p>{hoveredNode.description || 'No description.'}</p>
+                <p>
+                  <strong>Tags:</strong>{' '}
+                  {hoveredNode.tagIds
+                    .map((id) => tagById.get(id)?.name)
+                    .filter(Boolean)
+                    .join(', ') || 'None'}
+                </p>
+                <p>
+                  <strong>Quant:</strong>{' '}
+                  {Object.entries(hoveredNode.stats.quantitative)
+                    .map(([k, v]) => `${k}: ${v}`)
+                    .join(', ') || 'None'}
+                </p>
+                <p>
+                  <strong>Qual:</strong>{' '}
+                  {Object.entries(hoveredNode.stats.qualitative)
+                    .map(([k, v]) => `${k}: ${v}`)
+                    .join(', ') || 'None'}
+                </p>
+              </div>
+            )}
+          </section>
+        ) : (
+          <section className="panel list-view">
+            <h2>List View</h2>
+            <div className="row">
+              <input
+                value={newNodeName}
+                onChange={(event) => setNewNodeName(event.target.value)}
+                placeholder="New node name"
+              />
+              <button onClick={addNode}>Add</button>
             </div>
-          )}
-        </section>
+
+            <div className="list">
+              {project.nodes.map((node) => (
+                <div className="list-item" key={node.id}>
+                  <button
+                    className={selectedNodeId === node.id ? 'secondary active' : 'secondary'}
+                    onClick={() => setSelectedNodeId(node.id)}
+                  >
+                    {node.name}
+                  </button>
+                  <button className="danger" onClick={() => deleteNode(node.id)}>
+                    Delete
+                  </button>
+                </div>
+              ))}
+              {project.nodes.length === 0 && <p className="empty">No nodes yet.</p>}
+            </div>
+          </section>
+        )}
 
         <section className="panel node-editor">
           <h2>Selected Node Editor</h2>

@@ -41,6 +41,7 @@ type PositionedNode = {
 }
 
 type ThemeMode = 'light' | 'turtle-night'
+type CollapsibleSection = 'project' | 'tags' | 'nodes' | 'edges'
 
 const WIDTH = 980
 const HEIGHT = 680
@@ -311,6 +312,12 @@ function App() {
   const [qualKey, setQualKey] = useState('')
   const [qualValue, setQualValue] = useState('')
   const [hover, setHover] = useState<{ nodeId: string; x: number; y: number } | null>(null)
+  const [collapsedSections, setCollapsedSections] = useState<Record<CollapsibleSection, boolean>>({
+    project: false,
+    tags: false,
+    nodes: false,
+    edges: false,
+  })
 
   const visibleTagIds = useMemo(
     () => new Set(project.tags.filter((tag) => tag.visible).map((tag) => tag.id)),
@@ -352,6 +359,13 @@ function App() {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
   }, [theme])
+
+  function toggleSection(section: CollapsibleSection) {
+    setCollapsedSections((current) => ({
+      ...current,
+      [section]: !current[section],
+    }))
+  }
 
   function addTag() {
     const trimmed = newTagName.trim()
@@ -573,153 +587,173 @@ function App() {
     <div className="app">
       <aside className="sidebar">
         <section className="panel">
-          <h2>Project</h2>
-          <div className="project-actions">
-            <button onClick={exportJson}>Export JSON</button>
-            <label className="file-upload">
-              Import JSON
-              <input
-                type="file"
-                accept="application/json"
-                onChange={(event) => {
-                  void importJson(event.target.files?.[0])
-                  event.currentTarget.value = ''
-                }}
-              />
-            </label>
-            <button onClick={() => setProject(SAMPLE_DATA)}>Reset to Sample</button>
+          <div className="panel-head">
+            <h2>Tags (Dimensions)</h2>
+            <button
+              className="secondary collapse-toggle"
+              onClick={() => toggleSection('tags')}
+              aria-label={collapsedSections.tags ? 'Expand tags section' : 'Collapse tags section'}
+            >
+              {collapsedSections.tags ? '▾' : '▴'}
+            </button>
           </div>
-        </section>
-
-        <section className="panel">
-          <h2>Tags (Dimensions)</h2>
-          <div className="row">
-            <input
-              value={newTagName}
-              onChange={(event) => setNewTagName(event.target.value)}
-              placeholder="New tag name"
-            />
-            <input
-              className="color-input"
-              value={newTagColor}
-              type="color"
-              onChange={(event) => setNewTagColor(event.target.value)}
-            />
-            <button onClick={addTag}>Add</button>
-          </div>
-
-          <div className="list">
-            {project.tags.map((tag) => (
-              <div className="list-item" key={tag.id}>
+          {!collapsedSections.tags && (
+            <>
+              <div className="row">
                 <input
-                  className="checkbox"
-                  type="checkbox"
-                  checked={tag.visible}
-                  title="Toggle visible"
-                  onChange={(event) => updateTag(tag.id, { visible: event.target.checked })}
-                />
-                <input
-                  value={tag.name}
-                  onChange={(event) => updateTag(tag.id, { name: event.target.value })}
+                  value={newTagName}
+                  onChange={(event) => setNewTagName(event.target.value)}
+                  placeholder="New tag name"
                 />
                 <input
                   className="color-input"
+                  value={newTagColor}
                   type="color"
-                  value={tag.color}
-                  onChange={(event) => updateTag(tag.id, { color: event.target.value })}
+                  onChange={(event) => setNewTagColor(event.target.value)}
                 />
-                <button className="danger" onClick={() => deleteTag(tag.id)}>
-                  Delete
-                </button>
+                <button onClick={addTag}>Add</button>
               </div>
-            ))}
-            {project.tags.length === 0 && <p className="empty">No tags yet.</p>}
-          </div>
+
+              <div className="list">
+                {project.tags.map((tag) => (
+                  <div className="list-item" key={tag.id}>
+                    <input
+                      className="checkbox"
+                      type="checkbox"
+                      checked={tag.visible}
+                      title="Toggle visible"
+                      onChange={(event) => updateTag(tag.id, { visible: event.target.checked })}
+                    />
+                    <input
+                      value={tag.name}
+                      onChange={(event) => updateTag(tag.id, { name: event.target.value })}
+                    />
+                    <input
+                      className="color-input"
+                      type="color"
+                      value={tag.color}
+                      onChange={(event) => updateTag(tag.id, { color: event.target.value })}
+                    />
+                    <button className="danger" onClick={() => deleteTag(tag.id)}>
+                      Delete
+                    </button>
+                  </div>
+                ))}
+                {project.tags.length === 0 && <p className="empty">No tags yet.</p>}
+              </div>
+            </>
+          )}
         </section>
 
         <section className="panel">
-          <h2>Nodes</h2>
-          <div className="row">
-            <input
-              value={newNodeName}
-              onChange={(event) => setNewNodeName(event.target.value)}
-              placeholder="New node name"
-            />
-            <button onClick={addNode}>Add</button>
-          </div>
-
-          <div className="list">
-            {project.nodes.map((node) => (
-              <div className="list-item" key={node.id}>
-                <button
-                  className={selectedNodeId === node.id ? 'secondary active' : 'secondary'}
-                  onClick={() => setSelectedNodeId(node.id)}
-                >
-                  {node.name}
-                </button>
-                <button className="danger" onClick={() => deleteNode(node.id)}>
-                  Delete
-                </button>
-              </div>
-            ))}
-            {project.nodes.length === 0 && <p className="empty">No nodes yet.</p>}
-          </div>
-        </section>
-
-        <section className="panel">
-          <h2>Edges</h2>
-          <div className="row edge-form">
-            <select value={newEdgeFrom} onChange={(event) => setNewEdgeFrom(event.target.value)}>
-              <option value="">From node</option>
-              {project.nodes.map((node) => (
-                <option key={node.id} value={node.id}>
-                  {node.name}
-                </option>
-              ))}
-            </select>
-            <select value={newEdgeTo} onChange={(event) => setNewEdgeTo(event.target.value)}>
-              <option value="">To node</option>
-              {project.nodes.map((node) => (
-                <option key={node.id} value={node.id}>
-                  {node.name}
-                </option>
-              ))}
-            </select>
-            <select
-              value={newEdgeType}
-              onChange={(event) => setNewEdgeType(event.target.value as EdgeType)}
+          <div className="panel-head">
+            <h2>Nodes</h2>
+            <button
+              className="secondary collapse-toggle"
+              onClick={() => toggleSection('nodes')}
+              aria-label={collapsedSections.nodes ? 'Expand nodes section' : 'Collapse nodes section'}
             >
-              <option value="next">next</option>
-              <option value="previous">previous</option>
-              <option value="undirected">undirected</option>
-            </select>
-            <button onClick={addEdge}>Add</button>
+              {collapsedSections.nodes ? '▾' : '▴'}
+            </button>
           </div>
+          {!collapsedSections.nodes && (
+            <>
+              <div className="row">
+                <input
+                  value={newNodeName}
+                  onChange={(event) => setNewNodeName(event.target.value)}
+                  placeholder="New node name"
+                />
+                <button onClick={addNode}>Add</button>
+              </div>
 
-          <div className="list">
-            {project.edges.map((edge) => (
-              <div key={edge.id} className="edge-row">
-                <span>
-                  {(nodesById.get(edge.from)?.name ?? edge.from) + ' -> ' +
-                    (nodesById.get(edge.to)?.name ?? edge.to)}
-                </span>
+              <div className="list">
+                {project.nodes.map((node) => (
+                  <div className="list-item" key={node.id}>
+                    <button
+                      className={selectedNodeId === node.id ? 'secondary active' : 'secondary'}
+                      onClick={() => setSelectedNodeId(node.id)}
+                    >
+                      {node.name}
+                    </button>
+                    <button className="danger" onClick={() => deleteNode(node.id)}>
+                      Delete
+                    </button>
+                  </div>
+                ))}
+                {project.nodes.length === 0 && <p className="empty">No nodes yet.</p>}
+              </div>
+            </>
+          )}
+        </section>
+
+        <section className="panel">
+          <div className="panel-head">
+            <h2>Edges</h2>
+            <button
+              className="secondary collapse-toggle"
+              onClick={() => toggleSection('edges')}
+              aria-label={collapsedSections.edges ? 'Expand edges section' : 'Collapse edges section'}
+            >
+              {collapsedSections.edges ? '▾' : '▴'}
+            </button>
+          </div>
+          {!collapsedSections.edges && (
+            <>
+              <div className="row edge-form">
+                <select value={newEdgeFrom} onChange={(event) => setNewEdgeFrom(event.target.value)}>
+                  <option value="">From node</option>
+                  {project.nodes.map((node) => (
+                    <option key={node.id} value={node.id}>
+                      {node.name}
+                    </option>
+                  ))}
+                </select>
+                <select value={newEdgeTo} onChange={(event) => setNewEdgeTo(event.target.value)}>
+                  <option value="">To node</option>
+                  {project.nodes.map((node) => (
+                    <option key={node.id} value={node.id}>
+                      {node.name}
+                    </option>
+                  ))}
+                </select>
                 <select
-                  value={edge.type}
-                  onChange={(event) =>
-                    updateEdge(edge.id, { type: event.target.value as EdgeType })
-                  }
+                  value={newEdgeType}
+                  onChange={(event) => setNewEdgeType(event.target.value as EdgeType)}
                 >
                   <option value="next">next</option>
                   <option value="previous">previous</option>
                   <option value="undirected">undirected</option>
                 </select>
-                <button className="danger" onClick={() => deleteEdge(edge.id)}>
-                  Delete
-                </button>
+                <button onClick={addEdge}>Add</button>
               </div>
-            ))}
-            {project.edges.length === 0 && <p className="empty">No edges yet.</p>}
-          </div>
+
+              <div className="list">
+                {project.edges.map((edge) => (
+                  <div key={edge.id} className="edge-row">
+                    <span>
+                      {(nodesById.get(edge.from)?.name ?? edge.from) + ' -> ' +
+                        (nodesById.get(edge.to)?.name ?? edge.to)}
+                    </span>
+                    <select
+                      value={edge.type}
+                      onChange={(event) =>
+                        updateEdge(edge.id, { type: event.target.value as EdgeType })
+                      }
+                    >
+                      <option value="next">next</option>
+                      <option value="previous">previous</option>
+                      <option value="undirected">undirected</option>
+                    </select>
+                    <button className="danger" onClick={() => deleteEdge(edge.id)}>
+                      Delete
+                    </button>
+                  </div>
+                ))}
+                {project.edges.length === 0 && <p className="empty">No edges yet.</p>}
+              </div>
+            </>
+          )}
         </section>
       </aside>
 
@@ -739,6 +773,37 @@ function App() {
             Visible tags define filtered rendering. Nodes cluster by shared tags and connect through typed
             edges.
           </p>
+          <section className="header-project">
+            <div className="panel-head">
+              <h2>Project</h2>
+              <button
+                className="secondary collapse-toggle"
+                onClick={() => toggleSection('project')}
+                aria-label={
+                  collapsedSections.project ? 'Expand project section' : 'Collapse project section'
+                }
+              >
+                {collapsedSections.project ? '▾' : '▴'}
+              </button>
+            </div>
+            {!collapsedSections.project && (
+              <div className="project-actions">
+                <button onClick={exportJson}>Export JSON</button>
+                <label className="file-upload">
+                  Import JSON
+                  <input
+                    type="file"
+                    accept="application/json"
+                    onChange={(event) => {
+                      void importJson(event.target.files?.[0])
+                      event.currentTarget.value = ''
+                    }}
+                  />
+                </label>
+                <button onClick={() => setProject(SAMPLE_DATA)}>Reset to Sample</button>
+              </div>
+            )}
+          </section>
         </header>
 
         <section className="graph-shell">

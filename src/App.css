@@ -132,6 +132,25 @@ button.danger {
   font-size: 1rem;
 }
 
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.panel-head h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.collapse-toggle {
+  min-width: 32px;
+  padding: 5px 9px;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
 .main-area {
   display: grid;
   grid-template-rows: auto auto 1fr;
@@ -169,6 +188,12 @@ button.danger {
 .main-header p {
   margin: 7px 0 0;
   color: var(--muted);
+}
+
+.header-project {
+  margin-top: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
 }
 
 .graph-shell {

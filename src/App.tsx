@@ -10,7 +10,6 @@ type Tag = {
   color: string
   visible: boolean
   rootNodeId: string | null
-  statColor: string
   stats: {
     quantitative: Record<string, number>
     qualitative: Record<string, string>
@@ -75,7 +74,6 @@ const SAMPLE_DATA: ProjectData = {
       color: '#ef5b2f',
       visible: true,
       rootNodeId: 'node_fire_1',
-      statColor: '#ffb08b',
       stats: { quantitative: {}, qualitative: {} },
     },
     {
@@ -84,7 +82,6 @@ const SAMPLE_DATA: ProjectData = {
       color: '#2c75f5',
       visible: true,
       rootNodeId: 'node_water_1',
-      statColor: '#9cc3ff',
       stats: { quantitative: {}, qualitative: {} },
     },
     {
@@ -93,7 +90,6 @@ const SAMPLE_DATA: ProjectData = {
       color: '#7f8c3b',
       visible: true,
       rootNodeId: 'node_earth_1',
-      statColor: '#c9d69f',
       stats: { quantitative: {}, qualitative: {} },
     },
     {
@@ -102,7 +98,6 @@ const SAMPLE_DATA: ProjectData = {
       color: '#76b9d8',
       visible: true,
       rootNodeId: 'node_air_1',
-      statColor: '#bde2f2',
       stats: { quantitative: {}, qualitative: {} },
     },
     {
@@ -111,7 +106,6 @@ const SAMPLE_DATA: ProjectData = {
       color: '#f6d447',
       visible: true,
       rootNodeId: 'node_lightning_1',
-      statColor: '#ffe98f',
       stats: { quantitative: {}, qualitative: {} },
     },
     {
@@ -120,7 +114,6 @@ const SAMPLE_DATA: ProjectData = {
       color: '#8f9aaa',
       visible: true,
       rootNodeId: 'node_sword_1',
-      statColor: '#c3c9d4',
       stats: { quantitative: {}, qualitative: {} },
     },
   ],
@@ -385,7 +378,6 @@ const STARTER_TEMPLATE: ProjectData = {
       color: '#4f7cff',
       visible: true,
       rootNodeId: 'node_alpha_root',
-      statColor: '#9eb4ff',
       stats: { quantitative: {}, qualitative: {} },
     },
     {
@@ -394,7 +386,6 @@ const STARTER_TEMPLATE: ProjectData = {
       color: '#2ea06e',
       visible: true,
       rootNodeId: 'node_beta_root',
-      statColor: '#94d8bb',
       stats: { quantitative: {}, qualitative: {} },
     },
     {
@@ -403,7 +394,6 @@ const STARTER_TEMPLATE: ProjectData = {
       color: '#d57c2f',
       visible: true,
       rootNodeId: 'node_gamma_root',
-      statColor: '#efc39a',
       stats: { quantitative: {}, qualitative: {} },
     },
   ],
@@ -457,6 +447,13 @@ const STARTER_TEMPLATE: ProjectData = {
     { id: 'edge_gamma', from: 'node_gamma_root', to: 'node_gamma_child', type: 'next' },
   ],
   statStyles: [{ id: 'style_damage', key: 'damage', kind: 'quantitative', color: '#ff9f9f' }],
+}
+
+const BLANK_PROJECT: ProjectData = {
+  tags: [],
+  nodes: [],
+  edges: [],
+  statStyles: [],
 }
 
 function createId(prefix: string) {
@@ -515,7 +512,6 @@ function normalizeProject(input: ProjectData): ProjectData {
       color: String(tag.color ?? '#4577ff'),
       visible: Boolean(tag.visible ?? true),
       rootNodeId: tag.rootNodeId ? String(tag.rootNodeId) : null,
-      statColor: String(tag.statColor ?? '#9fb2d9'),
       stats: {
         quantitative,
         qualitative,
@@ -984,12 +980,12 @@ function App() {
         ...Object.entries(tag.stats.quantitative).map(([key, value]) => ({
           id: `${tag.id}:q:${key}`,
           text: `[${tag.name}] ${key}: ${value}`,
-          color: statStyleMap.get(`quantitative:${key}`) ?? tag.statColor,
+          color: statStyleMap.get(`quantitative:${key}`),
         })),
         ...Object.entries(tag.stats.qualitative).map(([key, value]) => ({
           id: `${tag.id}:s:${key}`,
           text: `[${tag.name}] ${key}: ${value}`,
-          color: statStyleMap.get(`qualitative:${key}`) ?? tag.statColor,
+          color: statStyleMap.get(`qualitative:${key}`),
         })),
       ])
   }, [hoveredNode, statStyleMap, tagById])
@@ -1115,7 +1111,6 @@ function App() {
       color: newTagColor,
       visible: true,
       rootNodeId: null,
-      statColor: newTagColor,
       stats: { quantitative: {}, qualitative: {} },
     }
 
@@ -1218,17 +1213,6 @@ function App() {
         qualitative: next,
       },
     })
-  }
-
-  function clearTagStats(tag: Tag) {
-    updateTag(tag.id, {
-      stats: {
-        quantitative: {},
-        qualitative: {},
-      },
-    })
-    setTagQuantDraft(tag.id, { key: '', value: '' })
-    setTagQualDraft(tag.id, { key: '', value: '' })
   }
 
   function addStatStyle() {
@@ -1551,16 +1535,6 @@ function App() {
                         onChange={(event) => updateTag(tag.id, { color: event.target.value })}
                         title="Tag color"
                       />
-                      <input
-                        className="color-input"
-                        type="color"
-                        value={tag.statColor}
-                        onChange={(event) => updateTag(tag.id, { statColor: event.target.value })}
-                        title="Tag stats hover color"
-                      />
-                      <button className="secondary" onClick={() => clearTagStats(tag)}>
-                        Clear Stats
-                      </button>
                       <button className="danger" onClick={() => deleteTag(tag.id)}>
                         Delete
                       </button>
@@ -1936,9 +1910,7 @@ function App() {
                 <button onClick={() => loadExampleTemplate(STARTER_TEMPLATE)}>
                   Load Starter Template
                 </button>
-                <button onClick={() => loadExampleTemplate(SAMPLE_DATA)}>
-                  Reset to Sample
-                </button>
+                <button onClick={() => loadExampleTemplate(BLANK_PROJECT)}>Start New</button>
               </div>
             )}
           </section>

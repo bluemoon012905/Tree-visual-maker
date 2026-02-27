@@ -140,6 +140,12 @@ button.danger {
   margin-bottom: 1px;
 }
 
+.panel-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .panel-head h2 {
   margin: 0;
   font-size: 1rem;

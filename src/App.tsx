@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 
 type EdgeType = 'next' | 'previous' | 'undirected'
+type StatKind = 'quantitative' | 'qualitative'
 
 type Tag = {
   id: string
@@ -38,6 +39,14 @@ type ProjectData = {
   tags: Tag[]
   nodes: NodeData[]
   edges: EdgeData[]
+  statStyles: StatStyle[]
+}
+
+type StatStyle = {
+  id: string
+  key: string
+  kind: StatKind
+  color: string
 }
 
 type PositionedNode = {
@@ -48,7 +57,7 @@ type PositionedNode = {
 
 type ThemeMode = 'light' | 'turtle-night'
 type ViewMode = 'graph' | 'graph3d' | 'list'
-type CollapsibleSection = 'project' | 'tags'
+type CollapsibleSection = 'project' | 'tags' | 'stats'
 type PositionedNode3D = PositionedNode & { z: number }
 
 const WIDTH = 980
@@ -136,6 +145,11 @@ const SAMPLE_DATA: ProjectData = {
       to: 'node_flame_aura',
       type: 'undirected',
     },
+  ],
+  statStyles: [
+    { id: 'style_mana_cost', key: 'manaCost', kind: 'quantitative', color: '#7fd4ff' },
+    { id: 'style_damage', key: 'damage', kind: 'quantitative', color: '#ff9f9f' },
+    { id: 'style_tier', key: 'tier', kind: 'qualitative', color: '#e5c3ff' },
   ],
 }
 
@@ -245,12 +259,19 @@ function normalizeProject(input: ProjectData): ProjectData {
           : 'undirected',
     }))
 
+  const statStyles = (input.statStyles ?? []).map((style) => ({
+    id: String(style.id ?? createId('style')),
+    key: String(style.key ?? '').trim(),
+    kind: (style.kind === 'quantitative' ? 'quantitative' : 'qualitative') as StatKind,
+    color: String(style.color ?? '#9fb2d9'),
+  }))
+
   const normalizedTags = tags.map((tag) => ({
     ...tag,
     rootNodeId: tag.rootNodeId && nodeIds.has(tag.rootNodeId) ? tag.rootNodeId : null,
   }))
 
-  return { tags: normalizedTags, nodes, edges }
+  return { tags: normalizedTags, nodes, edges, statStyles }
 }
 
 function sortProjectForExport(project: ProjectData): ProjectData {
@@ -282,8 +303,9 @@ function sortProjectForExport(project: ProjectData): ProjectData {
       },
     }))
   const edges = [...project.edges].sort((a, b) => a.id.localeCompare(b.id))
+  const statStyles = [...project.statStyles].sort((a, b) => a.id.localeCompare(b.id))
 
-  return { tags, nodes, edges }
+  return { tags, nodes, edges, statStyles }
 }
 
 function computeLayout(nodes: NodeData[], edges: EdgeData[]): PositionedNode[] {
@@ -395,8 +417,12 @@ function App() {
   const [isNodeEditorOpen, setIsNodeEditorOpen] = useState(false)
   const [newTagName, setNewTagName] = useState('')
   const [newTagColor, setNewTagColor] = useState('#4577ff')
+  const [showTagStatsInTagsPanel, setShowTagStatsInTagsPanel] = useState(false)
   const [tagQuantDrafts, setTagQuantDrafts] = useState<Record<string, { key: string; value: string }>>({})
   const [tagQualDrafts, setTagQualDrafts] = useState<Record<string, { key: string; value: string }>>({})
+  const [newStatKind, setNewStatKind] = useState<StatKind>('quantitative')
+  const [newStatKey, setNewStatKey] = useState('')
+  const [newStatColor, setNewStatColor] = useState('#9fb2d9')
   const [newEdgeTo, setNewEdgeTo] = useState('')
   const [newEdgeType, setNewEdgeType] = useState<EdgeType>('undirected')
   const [quantKey, setQuantKey] = useState('')
@@ -408,6 +434,7 @@ function App() {
   const [collapsedSections, setCollapsedSections] = useState<Record<CollapsibleSection, boolean>>({
     project: false,
     tags: false,
+    stats: false,
   })
 
   const visibleTagIds = useMemo(
@@ -478,15 +505,27 @@ function App() {
   )
 
   const hoveredNode = hover ? nodesById.get(hover.nodeId) ?? null : null
+  const statStyleMap = useMemo(
+    () => new Map(project.statStyles.map((style) => [`${style.kind}:${style.key}`, style.color])),
+    [project.statStyles],
+  )
   const hoveredNodeStatLines = useMemo(() => {
     if (!hoveredNode) {
       return []
     }
     return [
-      ...Object.entries(hoveredNode.stats.quantitative).map(([key, value]) => `${key}: ${value}`),
-      ...Object.entries(hoveredNode.stats.qualitative).map(([key, value]) => `${key}: ${value}`),
+      ...Object.entries(hoveredNode.stats.quantitative).map(([key, value]) => ({
+        id: `node:q:${key}`,
+        text: `${key}: ${value}`,
+        color: statStyleMap.get(`quantitative:${key}`),
+      })),
+      ...Object.entries(hoveredNode.stats.qualitative).map(([key, value]) => ({
+        id: `node:s:${key}`,
+        text: `${key}: ${value}`,
+        color: statStyleMap.get(`qualitative:${key}`),
+      })),
     ]
-  }, [hoveredNode])
+  }, [hoveredNode, statStyleMap])
   const hoveredTagStatLines = useMemo(() => {
     if (!hoveredNode) {
       return []
@@ -498,15 +537,15 @@ function App() {
         ...Object.entries(tag.stats.quantitative).map(([key, value]) => ({
           id: `${tag.id}:q:${key}`,
           text: `[${tag.name}] ${key}: ${value}`,
-          color: tag.statColor,
+          color: statStyleMap.get(`quantitative:${key}`) ?? tag.statColor,
         })),
         ...Object.entries(tag.stats.qualitative).map(([key, value]) => ({
           id: `${tag.id}:s:${key}`,
           text: `[${tag.name}] ${key}: ${value}`,
-          color: tag.statColor,
+          color: statStyleMap.get(`qualitative:${key}`) ?? tag.statColor,
         })),
       ])
-  }, [hoveredNode, tagById])
+  }, [hoveredNode, statStyleMap, tagById])
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
@@ -554,6 +593,7 @@ function App() {
         tagIds: node.tagIds.filter((id) => id !== tagId),
       })),
       edges: current.edges,
+      statStyles: current.statStyles,
     }))
     setTagQuantDrafts((current) => {
       const next = { ...current }
@@ -635,6 +675,48 @@ function App() {
     })
   }
 
+  function addStatStyle() {
+    const trimmedKey = newStatKey.trim()
+    if (!trimmedKey) {
+      return
+    }
+    setProject((current) => {
+      const existing = current.statStyles.find(
+        (style) => style.key === trimmedKey && style.kind === newStatKind,
+      )
+      if (existing) {
+        return {
+          ...current,
+          statStyles: current.statStyles.map((style) =>
+            style.id === existing.id ? { ...style, color: newStatColor } : style,
+          ),
+        }
+      }
+      return {
+        ...current,
+        statStyles: [
+          ...current.statStyles,
+          { id: createId('style'), key: trimmedKey, kind: newStatKind, color: newStatColor },
+        ],
+      }
+    })
+    setNewStatKey('')
+  }
+
+  function updateStatStyle(id: string, patch: Partial<StatStyle>) {
+    setProject((current) => ({
+      ...current,
+      statStyles: current.statStyles.map((style) => (style.id === id ? { ...style, ...patch } : style)),
+    }))
+  }
+
+  function deleteStatStyle(id: string) {
+    setProject((current) => ({
+      ...current,
+      statStyles: current.statStyles.filter((style) => style.id !== id),
+    }))
+  }
+
   function addNode() {
     const createdNode: NodeData = {
       id: createId('node'),
@@ -663,6 +745,7 @@ function App() {
       ),
       nodes: current.nodes.filter((node) => node.id !== nodeId),
       edges: current.edges.filter((edge) => edge.from !== nodeId && edge.to !== nodeId),
+      statStyles: current.statStyles,
     }))
 
     if (selectedNodeId === nodeId) {
@@ -837,13 +920,18 @@ function App() {
         <section className="panel">
           <div className="panel-head">
             <h2>Tags (Dimensions)</h2>
-            <button
-              className="secondary collapse-toggle"
-              onClick={() => toggleSection('tags')}
-              aria-label={collapsedSections.tags ? 'Expand tags section' : 'Collapse tags section'}
-            >
-              {collapsedSections.tags ? '▾' : '▴'}
-            </button>
+            <div className="panel-head-actions">
+              <button className="secondary" onClick={() => setShowTagStatsInTagsPanel((current) => !current)}>
+                {showTagStatsInTagsPanel ? 'Hide Tag Stats' : 'Show Tag Stats'}
+              </button>
+              <button
+                className="secondary collapse-toggle"
+                onClick={() => toggleSection('tags')}
+                aria-label={collapsedSections.tags ? 'Expand tags section' : 'Collapse tags section'}
+              >
+                {collapsedSections.tags ? '▾' : '▴'}
+              </button>
+            </div>
           </div>
           {!collapsedSections.tags && (
             <>
@@ -913,7 +1001,7 @@ function App() {
                           ))}
                       </select>
                     </div>
-                    <div className="tag-stats">
+                    {showTagStatsInTagsPanel && <div className="tag-stats">
                       <div>
                         <p className="subhead">Tag Quant</p>
                         <div className="stat-list">
@@ -986,10 +1074,65 @@ function App() {
                           <button onClick={() => addTagQualitativeStat(tag)}>Add</button>
                         </div>
                       </div>
-                    </div>
+                    </div>}
                   </div>
                 ))}
                 {project.tags.length === 0 && <p className="empty">No tags yet.</p>}
+              </div>
+            </>
+          )}
+        </section>
+
+        <section className="panel">
+          <div className="panel-head">
+            <h2>Stats</h2>
+            <button
+              className="secondary collapse-toggle"
+              onClick={() => toggleSection('stats')}
+              aria-label={collapsedSections.stats ? 'Expand stats section' : 'Collapse stats section'}
+            >
+              {collapsedSections.stats ? '▾' : '▴'}
+            </button>
+          </div>
+          {!collapsedSections.stats && (
+            <>
+              <div className="row">
+                <select
+                  value={newStatKind}
+                  onChange={(event) => setNewStatKind(event.target.value as StatKind)}
+                >
+                  <option value="quantitative">quantitative</option>
+                  <option value="qualitative">qualitative</option>
+                </select>
+                <input
+                  placeholder="stat key"
+                  value={newStatKey}
+                  onChange={(event) => setNewStatKey(event.target.value)}
+                />
+                <input
+                  className="color-input"
+                  type="color"
+                  value={newStatColor}
+                  onChange={(event) => setNewStatColor(event.target.value)}
+                />
+                <button onClick={addStatStyle}>Add</button>
+              </div>
+              <div className="list">
+                {project.statStyles.map((style) => (
+                  <div key={style.id} className="edge-row">
+                    <span>{`${style.kind}: ${style.key}`}</span>
+                    <input
+                      className="color-input"
+                      type="color"
+                      value={style.color}
+                      onChange={(event) => updateStatStyle(style.id, { color: event.target.value })}
+                    />
+                    <button className="danger" onClick={() => deleteStatStyle(style.id)}>
+                      Delete
+                    </button>
+                  </div>
+                ))}
+                {project.statStyles.length === 0 && <p className="empty">No stat colors yet.</p>}
               </div>
             </>
           )}
@@ -1353,7 +1496,9 @@ function App() {
               <div className="tooltip" style={{ left: hover.x + 14, top: hover.y + 14 }}>
                 <h3>{hoveredNode.name}</h3>
                 {hoveredNodeStatLines.map((statLine) => (
-                  <p key={statLine}>{statLine}</p>
+                  <p key={statLine.id} style={statLine.color ? { color: statLine.color } : undefined}>
+                    {statLine.text}
+                  </p>
                 ))}
                 {hoveredTagStatLines.map((statLine) => (
                   <p key={statLine.id} style={{ color: statLine.color }}>
@@ -1494,7 +1639,9 @@ function App() {
               <div className="tooltip" style={{ left: hover.x + 14, top: hover.y + 14 }}>
                 <h3>{hoveredNode.name}</h3>
                 {hoveredNodeStatLines.map((statLine) => (
-                  <p key={statLine}>{statLine}</p>
+                  <p key={statLine.id} style={statLine.color ? { color: statLine.color } : undefined}>
+                    {statLine.text}
+                  </p>
                 ))}
                 {hoveredTagStatLines.map((statLine) => (
                   <p key={statLine.id} style={{ color: statLine.color }}>

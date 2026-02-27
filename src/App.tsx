@@ -923,24 +923,24 @@ function App() {
             {hoveredNode && hover && (
               <div className="tooltip" style={{ left: hover.x + 14, top: hover.y + 14 }}>
                 <h3>{hoveredNode.name}</h3>
+                {[
+                  ...Object.entries(hoveredNode.stats.quantitative).map(
+                    ([key, value]) => `${key}: ${value}`,
+                  ),
+                  ...Object.entries(hoveredNode.stats.qualitative).map(
+                    ([key, value]) => `${key}: ${value}`,
+                  ),
+                ].map((statLine) => (
+                  <p key={statLine}>{statLine}</p>
+                ))}
+                {Object.keys(hoveredNode.stats.quantitative).length === 0 &&
+                  Object.keys(hoveredNode.stats.qualitative).length === 0 && <p>No stats.</p>}
                 <p>{hoveredNode.description || 'No description.'}</p>
                 <p>
-                  <strong>Tags:</strong>{' '}
+                  Tags:{' '}
                   {hoveredNode.tagIds
                     .map((id) => tagById.get(id)?.name)
                     .filter(Boolean)
-                    .join(', ') || 'None'}
-                </p>
-                <p>
-                  <strong>Quant:</strong>{' '}
-                  {Object.entries(hoveredNode.stats.quantitative)
-                    .map(([k, v]) => `${k}: ${v}`)
-                    .join(', ') || 'None'}
-                </p>
-                <p>
-                  <strong>Qual:</strong>{' '}
-                  {Object.entries(hoveredNode.stats.qualitative)
-                    .map(([k, v]) => `${k}: ${v}`)
                     .join(', ') || 'None'}
                 </p>
               </div>
@@ -1064,24 +1064,24 @@ function App() {
             {hoveredNode && hover && (
               <div className="tooltip" style={{ left: hover.x + 14, top: hover.y + 14 }}>
                 <h3>{hoveredNode.name}</h3>
+                {[
+                  ...Object.entries(hoveredNode.stats.quantitative).map(
+                    ([key, value]) => `${key}: ${value}`,
+                  ),
+                  ...Object.entries(hoveredNode.stats.qualitative).map(
+                    ([key, value]) => `${key}: ${value}`,
+                  ),
+                ].map((statLine) => (
+                  <p key={statLine}>{statLine}</p>
+                ))}
+                {Object.keys(hoveredNode.stats.quantitative).length === 0 &&
+                  Object.keys(hoveredNode.stats.qualitative).length === 0 && <p>No stats.</p>}
                 <p>{hoveredNode.description || 'No description.'}</p>
                 <p>
-                  <strong>Tags:</strong>{' '}
+                  Tags:{' '}
                   {hoveredNode.tagIds
                     .map((id) => tagById.get(id)?.name)
                     .filter(Boolean)
-                    .join(', ') || 'None'}
-                </p>
-                <p>
-                  <strong>Quant:</strong>{' '}
-                  {Object.entries(hoveredNode.stats.quantitative)
-                    .map(([k, v]) => `${k}: ${v}`)
-                    .join(', ') || 'None'}
-                </p>
-                <p>
-                  <strong>Qual:</strong>{' '}
-                  {Object.entries(hoveredNode.stats.qualitative)
-                    .map(([k, v]) => `${k}: ${v}`)
                     .join(', ') || 'None'}
                 </p>
               </div>

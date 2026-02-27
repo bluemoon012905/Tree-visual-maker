@@ -296,7 +296,7 @@ function computeLayout(nodes: NodeData[], edges: EdgeData[]): PositionedNode[] {
 }
 
 function App() {
-  const [theme, setTheme] = useState<ThemeMode>('light')
+  const [theme, setTheme] = useState<ThemeMode>('turtle-night')
   const [project, setProject] = useState<ProjectData>(SAMPLE_DATA)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(
     SAMPLE_DATA.nodes[0]?.id ?? null,

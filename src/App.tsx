@@ -873,9 +873,12 @@ function App() {
               })}
 
               {positions.map(({ node, x, y }) => {
-                const tags = node.tagIds
+                const visibleTags = node.tagIds
                   .map((id) => tagById.get(id))
-                  .filter((tag): tag is Tag => Boolean(tag))
+                  .filter((tag): tag is Tag => {
+                    if (!tag) return false
+                    return tag.visible
+                  })
 
                 return (
                   <g
@@ -903,7 +906,7 @@ function App() {
                     <circle
                       r={NODE_RADIUS}
                       fill={selectedNodeId === node.id ? 'var(--node-selected)' : 'var(--node-fill)'}
-                      stroke={tags[0]?.color ?? '#5b6f8a'}
+                      stroke={visibleTags[0]?.color ?? '#5b6f8a'}
                       strokeWidth={selectedNodeId === node.id ? 4 : 3}
                       className="node-circle"
                     />
@@ -1007,9 +1010,12 @@ function App() {
               })}
 
               {positions3D.map(({ node, x, y, z }) => {
-                const tags = node.tagIds
+                const visibleTags = node.tagIds
                   .map((id) => tagById.get(id))
-                  .filter((tag): tag is Tag => Boolean(tag))
+                  .filter((tag): tag is Tag => {
+                    if (!tag) return false
+                    return tag.visible
+                  })
                 const point = project3D(x, y, z)
                 const depthVisibility = (z + 1) / 2
                 const radius = NODE_RADIUS * point.scale
@@ -1041,7 +1047,7 @@ function App() {
                       r={radius}
                       fill={selectedNodeId === node.id ? 'var(--node-selected)' : 'var(--node-fill)'}
                       fillOpacity={0.64 + depthVisibility * 0.36}
-                      stroke={tags[0]?.color ?? '#5b6f8a'}
+                      stroke={visibleTags[0]?.color ?? '#5b6f8a'}
                       strokeWidth={(selectedNodeId === node.id ? 4 : 3) * point.scale}
                       className="node-circle"
                     />

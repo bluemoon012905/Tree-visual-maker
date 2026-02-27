@@ -114,6 +114,15 @@ const SAMPLE_DATA: ProjectData = {
       statColor: '#ffe98f',
       stats: { quantitative: {}, qualitative: {} },
     },
+    {
+      id: 'tag_sword',
+      name: 'Sword',
+      color: '#8f9aaa',
+      visible: true,
+      rootNodeId: 'node_sword_1',
+      statColor: '#c3c9d4',
+      stats: { quantitative: {}, qualitative: {} },
+    },
   ],
   nodes: [
     {
@@ -269,7 +278,7 @@ const SAMPLE_DATA: ProjectData = {
     {
       id: 'node_sword_1',
       name: 'sword_1',
-      tagIds: ['tag_magic', 'tag_fire', 'tag_ranged', 'tag_support', 'tag_lightning'],
+      tagIds: ['tag_sword', 'tag_magic', 'tag_fire', 'tag_ranged', 'tag_support', 'tag_lightning'],
       stats: {
         quantitative: { damage: 17, mana: 5, defense: 12 },
         qualitative: {},
@@ -279,7 +288,7 @@ const SAMPLE_DATA: ProjectData = {
     {
       id: 'node_sword_2',
       name: 'sword_2',
-      tagIds: ['tag_magic', 'tag_fire'],
+      tagIds: ['tag_sword', 'tag_magic', 'tag_fire'],
       stats: {
         quantitative: { damage: 25, mana: 7, defense: 15 },
         qualitative: {},
@@ -289,7 +298,7 @@ const SAMPLE_DATA: ProjectData = {
     {
       id: 'node_sword_3',
       name: 'sword_3',
-      tagIds: ['tag_ranged', 'tag_support'],
+      tagIds: ['tag_sword', 'tag_ranged', 'tag_support'],
       stats: {
         quantitative: { damage: 34, mana: 9, defense: 18 },
         qualitative: {},
@@ -299,7 +308,7 @@ const SAMPLE_DATA: ProjectData = {
     {
       id: 'node_sword_3_fw',
       name: 'sword_3_fw',
-      tagIds: ['tag_magic', 'tag_fire'],
+      tagIds: ['tag_sword', 'tag_magic', 'tag_fire'],
       stats: {
         quantitative: { damage: 38, mana: 12, defense: 19 },
         qualitative: {},
@@ -309,7 +318,7 @@ const SAMPLE_DATA: ProjectData = {
     {
       id: 'node_sword_3_ea',
       name: 'sword_3_ea',
-      tagIds: ['tag_ranged', 'tag_support'],
+      tagIds: ['tag_sword', 'tag_ranged', 'tag_support'],
       stats: {
         quantitative: { damage: 36, mana: 11, defense: 21 },
         qualitative: {},
@@ -319,7 +328,7 @@ const SAMPLE_DATA: ProjectData = {
     {
       id: 'node_sword_4_lf',
       name: 'sword_4_lf',
-      tagIds: ['tag_lightning', 'tag_magic'],
+      tagIds: ['tag_sword', 'tag_lightning', 'tag_magic'],
       stats: {
         quantitative: { damage: 48, mana: 16, defense: 23 },
         qualitative: {},

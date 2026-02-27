@@ -8,6 +8,11 @@ type Tag = {
   name: string
   color: string
   visible: boolean
+  statColor: string
+  stats: {
+    quantitative: Record<string, number>
+    qualitative: Record<string, string>
+  }
 }
 
 type NodeData = {
@@ -53,10 +58,38 @@ const NODE_TEXT_Y = Math.round(NODE_FONT_SIZE * 0.36)
 
 const SAMPLE_DATA: ProjectData = {
   tags: [
-    { id: 'tag_magic', name: 'Magic Damage', color: '#2657ff', visible: true },
-    { id: 'tag_fire', name: 'Fire Element', color: '#ef5b2f', visible: true },
-    { id: 'tag_ranged', name: 'Ranged', color: '#23ad77', visible: true },
-    { id: 'tag_support', name: 'Support', color: '#bb53db', visible: true },
+    {
+      id: 'tag_magic',
+      name: 'Magic Damage',
+      color: '#2657ff',
+      visible: true,
+      statColor: '#93a9ff',
+      stats: { quantitative: { bonusPower: 12 }, qualitative: { attunement: 'Arcane' } },
+    },
+    {
+      id: 'tag_fire',
+      name: 'Fire Element',
+      color: '#ef5b2f',
+      visible: true,
+      statColor: '#ffb08b',
+      stats: { quantitative: { burnChance: 18 }, qualitative: { element: 'Fire' } },
+    },
+    {
+      id: 'tag_ranged',
+      name: 'Ranged',
+      color: '#23ad77',
+      visible: true,
+      statColor: '#98ebcc',
+      stats: { quantitative: {}, qualitative: {} },
+    },
+    {
+      id: 'tag_support',
+      name: 'Support',
+      color: '#bb53db',
+      visible: true,
+      statColor: '#e2b1f1',
+      stats: { quantitative: {}, qualitative: {} },
+    },
   ],
   nodes: [
     {
@@ -143,12 +176,30 @@ function isHexColor(value: string) {
 }
 
 function normalizeProject(input: ProjectData): ProjectData {
-  const tags = (input.tags ?? []).map((tag) => ({
-    id: String(tag.id ?? createId('tag')),
-    name: String(tag.name ?? 'New Tag'),
-    color: String(tag.color ?? '#4577ff'),
-    visible: Boolean(tag.visible ?? true),
-  }))
+  const tags = (input.tags ?? []).map((tag) => {
+    const quantitative: Record<string, number> = {}
+    for (const key of Object.keys(tag.stats?.quantitative ?? {})) {
+      const numeric = Number(tag.stats?.quantitative?.[key])
+      if (Number.isFinite(numeric)) {
+        quantitative[key] = numeric
+      }
+    }
+    const qualitative = Object.fromEntries(
+      Object.entries(tag.stats?.qualitative ?? {}).map(([key, value]) => [key, String(value)]),
+    )
+
+    return {
+      id: String(tag.id ?? createId('tag')),
+      name: String(tag.name ?? 'New Tag'),
+      color: String(tag.color ?? '#4577ff'),
+      visible: Boolean(tag.visible ?? true),
+      statColor: String(tag.statColor ?? '#9fb2d9'),
+      stats: {
+        quantitative,
+        qualitative,
+      },
+    }
+  })
   const tagIds = new Set(tags.map((tag) => tag.id))
 
   const nodes = (input.nodes ?? []).map((node) => {
@@ -196,7 +247,19 @@ function normalizeProject(input: ProjectData): ProjectData {
 }
 
 function sortProjectForExport(project: ProjectData): ProjectData {
-  const tags = [...project.tags].sort((a, b) => a.id.localeCompare(b.id))
+  const tags = [...project.tags]
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map((tag) => ({
+      ...tag,
+      stats: {
+        quantitative: Object.fromEntries(
+          Object.entries(tag.stats.quantitative).sort(([a], [b]) => a.localeCompare(b)),
+        ),
+        qualitative: Object.fromEntries(
+          Object.entries(tag.stats.qualitative).sort(([a], [b]) => a.localeCompare(b)),
+        ),
+      },
+    }))
   const nodes = [...project.nodes]
     .sort((a, b) => a.id.localeCompare(b.id))
     .map((node) => ({
@@ -326,6 +389,8 @@ function App() {
   const [newTagName, setNewTagName] = useState('')
   const [newTagColor, setNewTagColor] = useState('#4577ff')
   const [newTagColorHex, setNewTagColorHex] = useState('#4577ff')
+  const [tagQuantDrafts, setTagQuantDrafts] = useState<Record<string, { key: string; value: string }>>({})
+  const [tagQualDrafts, setTagQualDrafts] = useState<Record<string, { key: string; value: string }>>({})
   const [newEdgeTo, setNewEdgeTo] = useState('')
   const [newEdgeType, setNewEdgeType] = useState<EdgeType>('undirected')
   const [quantKey, setQuantKey] = useState('')
@@ -394,6 +459,35 @@ function App() {
   )
 
   const hoveredNode = hover ? nodesById.get(hover.nodeId) ?? null : null
+  const hoveredNodeStatLines = useMemo(() => {
+    if (!hoveredNode) {
+      return []
+    }
+    return [
+      ...Object.entries(hoveredNode.stats.quantitative).map(([key, value]) => `${key}: ${value}`),
+      ...Object.entries(hoveredNode.stats.qualitative).map(([key, value]) => `${key}: ${value}`),
+    ]
+  }, [hoveredNode])
+  const hoveredTagStatLines = useMemo(() => {
+    if (!hoveredNode) {
+      return []
+    }
+    return hoveredNode.tagIds
+      .map((id) => tagById.get(id))
+      .filter((tag): tag is Tag => Boolean(tag))
+      .flatMap((tag) => [
+        ...Object.entries(tag.stats.quantitative).map(([key, value]) => ({
+          id: `${tag.id}:q:${key}`,
+          text: `[${tag.name}] ${key}: ${value}`,
+          color: tag.statColor,
+        })),
+        ...Object.entries(tag.stats.qualitative).map(([key, value]) => ({
+          id: `${tag.id}:s:${key}`,
+          text: `[${tag.name}] ${key}: ${value}`,
+          color: tag.statColor,
+        })),
+      ])
+  }, [hoveredNode, tagById])
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
@@ -417,6 +511,8 @@ function App() {
       name: trimmed,
       color: newTagColor,
       visible: true,
+      statColor: newTagColor,
+      stats: { quantitative: {}, qualitative: {} },
     }
 
     setProject((current) => ({ ...current, tags: [...current.tags, createdTag] }))
@@ -439,6 +535,84 @@ function App() {
       })),
       edges: current.edges,
     }))
+    setTagQuantDrafts((current) => {
+      const next = { ...current }
+      delete next[tagId]
+      return next
+    })
+    setTagQualDrafts((current) => {
+      const next = { ...current }
+      delete next[tagId]
+      return next
+    })
+  }
+
+  function setTagQuantDraft(tagId: string, patch: Partial<{ key: string; value: string }>) {
+    setTagQuantDrafts((current) => ({
+      ...current,
+      [tagId]: { key: current[tagId]?.key ?? '', value: current[tagId]?.value ?? '', ...patch },
+    }))
+  }
+
+  function setTagQualDraft(tagId: string, patch: Partial<{ key: string; value: string }>) {
+    setTagQualDrafts((current) => ({
+      ...current,
+      [tagId]: { key: current[tagId]?.key ?? '', value: current[tagId]?.value ?? '', ...patch },
+    }))
+  }
+
+  function addTagQuantitativeStat(tag: Tag) {
+    const draft = tagQuantDrafts[tag.id] ?? { key: '', value: '' }
+    const key = draft.key.trim()
+    const numeric = Number(draft.value)
+    if (!key || !Number.isFinite(numeric)) {
+      return
+    }
+    updateTag(tag.id, {
+      stats: {
+        ...tag.stats,
+        quantitative: { ...tag.stats.quantitative, [key]: numeric },
+      },
+    })
+    setTagQuantDraft(tag.id, { key: '', value: '' })
+  }
+
+  function removeTagQuantitativeStat(tag: Tag, key: string) {
+    const next = { ...tag.stats.quantitative }
+    delete next[key]
+    updateTag(tag.id, {
+      stats: {
+        ...tag.stats,
+        quantitative: next,
+      },
+    })
+  }
+
+  function addTagQualitativeStat(tag: Tag) {
+    const draft = tagQualDrafts[tag.id] ?? { key: '', value: '' }
+    const key = draft.key.trim()
+    const value = draft.value.trim()
+    if (!key || !value) {
+      return
+    }
+    updateTag(tag.id, {
+      stats: {
+        ...tag.stats,
+        qualitative: { ...tag.stats.qualitative, [key]: value },
+      },
+    })
+    setTagQualDraft(tag.id, { key: '', value: '' })
+  }
+
+  function removeTagQualitativeStat(tag: Tag, key: string) {
+    const next = { ...tag.stats.qualitative }
+    delete next[key]
+    updateTag(tag.id, {
+      stats: {
+        ...tag.stats,
+        qualitative: next,
+      },
+    })
   }
 
   function addNode() {
@@ -677,42 +851,126 @@ function App() {
 
               <div className="list">
                 {project.tags.map((tag) => (
-                  <div className="list-item" key={tag.id}>
-                    <input
-                      className="checkbox"
-                      type="checkbox"
-                      checked={tag.visible}
-                      title="Toggle visible"
-                      onChange={(event) => updateTag(tag.id, { visible: event.target.checked })}
-                    />
-                    <input
-                      value={tag.name}
-                      onChange={(event) => updateTag(tag.id, { name: event.target.value })}
-                    />
-                    <input
-                      className="color-input"
-                      type="color"
-                      value={tag.color}
-                      onChange={(event) => updateTag(tag.id, { color: event.target.value })}
-                    />
-                    <input
-                      className="hex-input"
-                      key={`${tag.id}:${tag.color}`}
-                      defaultValue={tag.color}
-                      onBlur={(event) => {
-                        const value = event.target.value.trim().toLowerCase()
-                        if (!isHexColor(value)) {
-                          event.currentTarget.value = tag.color
-                          return
-                        }
-                        updateTag(tag.id, { color: value })
-                        event.currentTarget.value = value
-                      }}
-                      placeholder="#4577ff"
-                    />
-                    <button className="danger" onClick={() => deleteTag(tag.id)}>
-                      Delete
-                    </button>
+                  <div className="tag-item" key={tag.id}>
+                    <div className="list-item">
+                      <input
+                        className="checkbox"
+                        type="checkbox"
+                        checked={tag.visible}
+                        title="Toggle visible"
+                        onChange={(event) => updateTag(tag.id, { visible: event.target.checked })}
+                      />
+                      <input
+                        value={tag.name}
+                        onChange={(event) => updateTag(tag.id, { name: event.target.value })}
+                      />
+                      <input
+                        className="color-input"
+                        type="color"
+                        value={tag.color}
+                        onChange={(event) => updateTag(tag.id, { color: event.target.value })}
+                        title="Tag color"
+                      />
+                      <input
+                        className="hex-input"
+                        key={`${tag.id}:${tag.color}`}
+                        defaultValue={tag.color}
+                        onBlur={(event) => {
+                          const value = event.target.value.trim().toLowerCase()
+                          if (!isHexColor(value)) {
+                            event.currentTarget.value = tag.color
+                            return
+                          }
+                          updateTag(tag.id, { color: value })
+                          event.currentTarget.value = value
+                        }}
+                        placeholder="#4577ff"
+                      />
+                      <input
+                        className="color-input"
+                        type="color"
+                        value={tag.statColor}
+                        onChange={(event) => updateTag(tag.id, { statColor: event.target.value })}
+                        title="Tag stats hover color"
+                      />
+                      <button className="danger" onClick={() => deleteTag(tag.id)}>
+                        Delete
+                      </button>
+                    </div>
+                    <div className="tag-stats">
+                      <div>
+                        <p className="subhead">Tag Quant</p>
+                        <div className="stat-list">
+                          {Object.entries(tag.stats.quantitative).map(([key, value]) => (
+                            <div className="stat-row" key={key}>
+                              <span>{`${key}: ${value}`}</span>
+                              <button
+                                className="danger"
+                                onClick={() => removeTagQuantitativeStat(tag, key)}
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          ))}
+                          {Object.keys(tag.stats.quantitative).length === 0 && (
+                            <p className="empty">No quant stats.</p>
+                          )}
+                        </div>
+                        <div className="row">
+                          <input
+                            placeholder="key"
+                            value={tagQuantDrafts[tag.id]?.key ?? ''}
+                            onChange={(event) =>
+                              setTagQuantDraft(tag.id, { key: event.target.value })
+                            }
+                          />
+                          <input
+                            placeholder="value"
+                            value={tagQuantDrafts[tag.id]?.value ?? ''}
+                            onChange={(event) =>
+                              setTagQuantDraft(tag.id, { value: event.target.value })
+                            }
+                          />
+                          <button onClick={() => addTagQuantitativeStat(tag)}>Add</button>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="subhead">Tag Qual</p>
+                        <div className="stat-list">
+                          {Object.entries(tag.stats.qualitative).map(([key, value]) => (
+                            <div className="stat-row" key={key}>
+                              <span>{`${key}: ${value}`}</span>
+                              <button
+                                className="danger"
+                                onClick={() => removeTagQualitativeStat(tag, key)}
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          ))}
+                          {Object.keys(tag.stats.qualitative).length === 0 && (
+                            <p className="empty">No qual stats.</p>
+                          )}
+                        </div>
+                        <div className="row">
+                          <input
+                            placeholder="key"
+                            value={tagQualDrafts[tag.id]?.key ?? ''}
+                            onChange={(event) =>
+                              setTagQualDraft(tag.id, { key: event.target.value })
+                            }
+                          />
+                          <input
+                            placeholder="value"
+                            value={tagQualDrafts[tag.id]?.value ?? ''}
+                            onChange={(event) =>
+                              setTagQualDraft(tag.id, { value: event.target.value })
+                            }
+                          />
+                          <button onClick={() => addTagQualitativeStat(tag)}>Add</button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 ))}
                 {project.tags.length === 0 && <p className="empty">No tags yet.</p>}
@@ -1066,18 +1324,15 @@ function App() {
             {hoveredNode && hover && (
               <div className="tooltip" style={{ left: hover.x + 14, top: hover.y + 14 }}>
                 <h3>{hoveredNode.name}</h3>
-                {[
-                  ...Object.entries(hoveredNode.stats.quantitative).map(
-                    ([key, value]) => `${key}: ${value}`,
-                  ),
-                  ...Object.entries(hoveredNode.stats.qualitative).map(
-                    ([key, value]) => `${key}: ${value}`,
-                  ),
-                ].map((statLine) => (
+                {hoveredNodeStatLines.map((statLine) => (
                   <p key={statLine}>{statLine}</p>
                 ))}
-                {Object.keys(hoveredNode.stats.quantitative).length === 0 &&
-                  Object.keys(hoveredNode.stats.qualitative).length === 0 && <p>No stats.</p>}
+                {hoveredTagStatLines.map((statLine) => (
+                  <p key={statLine.id} style={{ color: statLine.color }}>
+                    {statLine.text}
+                  </p>
+                ))}
+                {hoveredNodeStatLines.length === 0 && hoveredTagStatLines.length === 0 && <p>No stats.</p>}
                 <p>{hoveredNode.description || 'No description.'}</p>
                 <p>
                   Tags:{' '}
@@ -1210,18 +1465,15 @@ function App() {
             {hoveredNode && hover && (
               <div className="tooltip" style={{ left: hover.x + 14, top: hover.y + 14 }}>
                 <h3>{hoveredNode.name}</h3>
-                {[
-                  ...Object.entries(hoveredNode.stats.quantitative).map(
-                    ([key, value]) => `${key}: ${value}`,
-                  ),
-                  ...Object.entries(hoveredNode.stats.qualitative).map(
-                    ([key, value]) => `${key}: ${value}`,
-                  ),
-                ].map((statLine) => (
+                {hoveredNodeStatLines.map((statLine) => (
                   <p key={statLine}>{statLine}</p>
                 ))}
-                {Object.keys(hoveredNode.stats.quantitative).length === 0 &&
-                  Object.keys(hoveredNode.stats.qualitative).length === 0 && <p>No stats.</p>}
+                {hoveredTagStatLines.map((statLine) => (
+                  <p key={statLine.id} style={{ color: statLine.color }}>
+                    {statLine.text}
+                  </p>
+                ))}
+                {hoveredNodeStatLines.length === 0 && hoveredTagStatLines.length === 0 && <p>No stats.</p>}
                 <p>{hoveredNode.description || 'No description.'}</p>
                 <p>
                   Tags:{' '}

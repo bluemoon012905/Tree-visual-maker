@@ -914,6 +914,13 @@ function App() {
     }
   }
 
+  function loadExampleTemplate() {
+    setProject(SAMPLE_DATA)
+    setSelectedNodeId(null)
+    setIsNodeEditorOpen(false)
+    setShowRootNodesOnly(false)
+  }
+
   return (
     <div className="app">
       <aside className="sidebar">
@@ -1348,12 +1355,16 @@ function App() {
                     }}
                   />
                 </label>
+                <button onClick={loadExampleTemplate}>Load Example/Template</button>
                 <button
                   onClick={() => {
-                    setProject(SAMPLE_DATA)
-                    setSelectedNodeId(null)
-                    setIsNodeEditorOpen(false)
-                    setShowRootNodesOnly(false)
+                    const confirmed = window.confirm(
+                      "Are you sure? We save none of the progress if you haven't exported.",
+                    )
+                    if (!confirmed) {
+                      return
+                    }
+                    loadExampleTemplate()
                   }}
                 >
                   Reset to Sample

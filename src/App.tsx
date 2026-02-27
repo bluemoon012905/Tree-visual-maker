@@ -368,6 +368,88 @@ const SAMPLE_DATA: ProjectData = {
   ],
 }
 
+const STARTER_TEMPLATE: ProjectData = {
+  tags: [
+    {
+      id: 'tag_alpha',
+      name: 'Tag Alpha',
+      color: '#4f7cff',
+      visible: true,
+      rootNodeId: 'node_alpha_root',
+      statColor: '#9eb4ff',
+      stats: { quantitative: {}, qualitative: {} },
+    },
+    {
+      id: 'tag_beta',
+      name: 'Tag Beta',
+      color: '#2ea06e',
+      visible: true,
+      rootNodeId: 'node_beta_root',
+      statColor: '#94d8bb',
+      stats: { quantitative: {}, qualitative: {} },
+    },
+    {
+      id: 'tag_gamma',
+      name: 'Tag Gamma',
+      color: '#d57c2f',
+      visible: true,
+      rootNodeId: 'node_gamma_root',
+      statColor: '#efc39a',
+      stats: { quantitative: {}, qualitative: {} },
+    },
+  ],
+  nodes: [
+    {
+      id: 'node_alpha_root',
+      name: 'root node 1',
+      tagIds: ['tag_alpha'],
+      stats: { quantitative: { damage: 10 }, qualitative: {} },
+      description: 'Starter root node.',
+    },
+    {
+      id: 'node_alpha_child',
+      name: 'child node 1',
+      tagIds: ['tag_alpha'],
+      stats: { quantitative: { damage: 16 }, qualitative: {} },
+      description: 'Starter child node.',
+    },
+    {
+      id: 'node_beta_root',
+      name: 'root node 2',
+      tagIds: ['tag_beta'],
+      stats: { quantitative: { damage: 11 }, qualitative: {} },
+      description: 'Starter root node.',
+    },
+    {
+      id: 'node_beta_child',
+      name: 'child node 2',
+      tagIds: ['tag_beta'],
+      stats: { quantitative: { damage: 17 }, qualitative: {} },
+      description: 'Starter child node.',
+    },
+    {
+      id: 'node_gamma_root',
+      name: 'root node 3',
+      tagIds: ['tag_gamma'],
+      stats: { quantitative: { damage: 12 }, qualitative: {} },
+      description: 'Starter root node.',
+    },
+    {
+      id: 'node_gamma_child',
+      name: 'child node 3',
+      tagIds: ['tag_gamma'],
+      stats: { quantitative: { damage: 18 }, qualitative: {} },
+      description: 'Starter child node.',
+    },
+  ],
+  edges: [
+    { id: 'edge_alpha', from: 'node_alpha_root', to: 'node_alpha_child', type: 'next' },
+    { id: 'edge_beta', from: 'node_beta_root', to: 'node_beta_child', type: 'next' },
+    { id: 'edge_gamma', from: 'node_gamma_root', to: 'node_gamma_child', type: 'next' },
+  ],
+  statStyles: [{ id: 'style_damage', key: 'damage', kind: 'quantitative', color: '#ff9f9f' }],
+}
+
 function createId(prefix: string) {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return `${prefix}_${crypto.randomUUID().slice(0, 8)}`
@@ -1373,8 +1455,8 @@ function App() {
     }
   }
 
-  function loadExampleTemplate() {
-    setProject(SAMPLE_DATA)
+  function loadExampleTemplate(template: ProjectData = SAMPLE_DATA) {
+    setProject(template)
     setSelectedNodeId(null)
     setIsNodeEditorOpen(false)
     setShowRootNodesOnly(false)
@@ -1819,7 +1901,10 @@ function App() {
                     }}
                   />
                 </label>
-                <button onClick={loadExampleTemplate}>Load Example/Template</button>
+                <button onClick={() => loadExampleTemplate(SAMPLE_DATA)}>Load Branches Demo</button>
+                <button onClick={() => loadExampleTemplate(STARTER_TEMPLATE)}>
+                  Load Starter Template
+                </button>
                 <button
                   onClick={() => {
                     const confirmed = window.confirm(
@@ -1828,7 +1913,7 @@ function App() {
                     if (!confirmed) {
                       return
                     }
-                    loadExampleTemplate()
+                    loadExampleTemplate(SAMPLE_DATA)
                   }}
                 >
                   Reset to Sample

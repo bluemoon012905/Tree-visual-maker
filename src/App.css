@@ -178,12 +178,6 @@ button.danger {
   gap: 10px;
 }
 
-.header-controls {
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-}
-
 .theme-switcher {
   display: inline-flex;
   align-items: center;
@@ -201,6 +195,12 @@ button.danger {
   margin-top: 12px;
   border-top: 1px solid var(--line);
   padding-top: 10px;
+}
+
+.view-mode-bar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
 }
 
 .graph-shell {
@@ -406,8 +406,4 @@ button.danger {
     align-items: flex-start;
   }
 
-  .header-controls {
-    width: 100%;
-    flex-wrap: wrap;
-  }
 }

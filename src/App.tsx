@@ -723,22 +723,13 @@ function App() {
         <header className="main-header">
           <div className="main-header-top">
             <h1>Skill Tree Visualizer</h1>
-            <div className="header-controls">
-              <label className="theme-switcher">
-                Theme
-                <select value={theme} onChange={(event) => setTheme(event.target.value as ThemeMode)}>
-                  <option value="light">Light</option>
-                  <option value="turtle-night">Turtle's night</option>
-                </select>
-              </label>
-              <label className="theme-switcher">
-                View
-                <select value={viewMode} onChange={(event) => setViewMode(event.target.value as ViewMode)}>
-                  <option value="graph">Visual</option>
-                  <option value="list">List view</option>
-                </select>
-              </label>
-            </div>
+            <label className="theme-switcher">
+              Theme
+              <select value={theme} onChange={(event) => setTheme(event.target.value as ThemeMode)}>
+                <option value="light">Light</option>
+                <option value="turtle-night">Turtle's night</option>
+              </select>
+            </label>
           </div>
           <p>
             Visible tags define filtered rendering. Nodes cluster by shared tags and connect through typed
@@ -776,6 +767,15 @@ function App() {
             )}
           </section>
         </header>
+        <section className="panel view-mode-bar">
+          <label className="theme-switcher">
+            View
+            <select value={viewMode} onChange={(event) => setViewMode(event.target.value as ViewMode)}>
+              <option value="graph">Visual</option>
+              <option value="list">List view</option>
+            </select>
+          </label>
+        </section>
 
         {viewMode === 'graph' ? (
           <section className="graph-shell">

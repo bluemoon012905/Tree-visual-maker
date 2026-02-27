@@ -4,23 +4,32 @@ Interactive skill tree / ability graph editor with tag-dimension clustering, typ
 
 ## What Is Implemented
 
+- Project controls:
+  - Theme selector (default: `Turtle's night`)
+  - View switcher: `Visual` / `List view`
+  - Export JSON, Import JSON, Reset to sample
+  - Collapsible project section in header
 - Tag (dimension) management:
   - Create, rename, recolor, delete tags
   - Toggle tag visibility
+  - Collapsible tags section
 - Node management:
   - Create, rename, delete nodes
   - Attach/detach tags
   - Edit description
   - Edit quantitative and qualitative stats
+  - Dedicated main-area `List view` for node list management
 - Edge management:
   - Create/delete connections between nodes
   - Edge types: `next`, `previous`, `undirected`
+  - Collapsible edges section
 - Visualization:
   - SVG graph render
   - Node clustering by shared tags (Jaccard-based force simulation)
   - Edge rendering with style by type
   - Tag visibility controls which nodes are rendered
   - Hover tooltip with full node metadata
+  - Dynamic node label sizing based on node size
 - Data portability:
   - Export current project to downloadable JSON
   - Import JSON file to continue editing

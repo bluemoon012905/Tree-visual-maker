@@ -41,8 +41,9 @@ type PositionedNode = {
 }
 
 type ThemeMode = 'light' | 'turtle-night'
-type ViewMode = 'graph' | 'list'
+type ViewMode = 'graph' | 'graph3d' | 'list'
 type CollapsibleSection = 'project' | 'tags' | 'edges'
+type PositionedNode3D = PositionedNode & { z: number }
 
 const WIDTH = 980
 const HEIGHT = 680
@@ -299,6 +300,19 @@ function computeLayout(nodes: NodeData[], edges: EdgeData[]): PositionedNode[] {
   return state.map((item) => ({ node: item.node, x: item.x, y: item.y }))
 }
 
+function depthScale(z: number) {
+  return 0.72 + ((z + 1) / 2) * 0.62
+}
+
+function project3D(x: number, y: number, z: number) {
+  const scale = depthScale(z)
+  return {
+    x: WIDTH / 2 + (x - WIDTH / 2) * scale,
+    y: HEIGHT / 2 + (y - HEIGHT / 2) * scale,
+    scale,
+  }
+}
+
 function App() {
   const [theme, setTheme] = useState<ThemeMode>('turtle-night')
   const [viewMode, setViewMode] = useState<ViewMode>('graph')
@@ -346,6 +360,16 @@ function App() {
     () => computeLayout(visibleNodes, visibleEdges),
     [visibleNodes, visibleEdges],
   )
+  const positions3D = useMemo<PositionedNode3D[]>(
+    () =>
+      positions
+        .map((item) => ({
+          ...item,
+          z: hashToUnit(`${item.node.id}:z`) * 2 - 1,
+        }))
+        .sort((a, b) => a.z - b.z),
+    [positions],
+  )
 
   const selectedNode = useMemo(
     () => project.nodes.find((node) => node.id === selectedNodeId) ?? null,
@@ -355,6 +379,10 @@ function App() {
   const nodesById = useMemo(() => new Map(project.nodes.map((node) => [node.id, node])), [project.nodes])
   const tagById = useMemo(() => new Map(project.tags.map((tag) => [tag.id, tag])), [project.tags])
   const positionedById = useMemo(() => new Map(positions.map((item) => [item.node.id, item])), [positions])
+  const positioned3DById = useMemo(
+    () => new Map(positions3D.map((item) => [item.node.id, item])),
+    [positions3D],
+  )
 
   const hoveredNode = hover ? nodesById.get(hover.nodeId) ?? null : null
 
@@ -782,6 +810,7 @@ function App() {
               View
               <select value={viewMode} onChange={(event) => setViewMode(event.target.value as ViewMode)}>
                 <option value="graph">Visual</option>
+                <option value="graph3d">3D</option>
                 <option value="list">List view</option>
               </select>
             </label>
@@ -883,6 +912,147 @@ function App() {
                       textAnchor="middle"
                       y={NODE_TEXT_Y}
                       style={{ fontSize: `${NODE_FONT_SIZE}px` }}
+                    >
+                      {node.name.slice(0, 13)}
+                    </text>
+                  </g>
+                )
+              })}
+            </svg>
+
+            {hoveredNode && hover && (
+              <div className="tooltip" style={{ left: hover.x + 14, top: hover.y + 14 }}>
+                <h3>{hoveredNode.name}</h3>
+                <p>{hoveredNode.description || 'No description.'}</p>
+                <p>
+                  <strong>Tags:</strong>{' '}
+                  {hoveredNode.tagIds
+                    .map((id) => tagById.get(id)?.name)
+                    .filter(Boolean)
+                    .join(', ') || 'None'}
+                </p>
+                <p>
+                  <strong>Quant:</strong>{' '}
+                  {Object.entries(hoveredNode.stats.quantitative)
+                    .map(([k, v]) => `${k}: ${v}`)
+                    .join(', ') || 'None'}
+                </p>
+                <p>
+                  <strong>Qual:</strong>{' '}
+                  {Object.entries(hoveredNode.stats.qualitative)
+                    .map(([k, v]) => `${k}: ${v}`)
+                    .join(', ') || 'None'}
+                </p>
+              </div>
+            )}
+          </section>
+        ) : viewMode === 'graph3d' ? (
+          <section className="graph-shell">
+            <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="Skill tree 3D graph">
+              <defs>
+                <marker
+                  id="arrow-next"
+                  markerWidth="10"
+                  markerHeight="8"
+                  refX="8"
+                  refY="4"
+                  orient="auto"
+                >
+                  <path d="M0,0 L10,4 L0,8 z" fill="#0c63e7" />
+                </marker>
+                <marker
+                  id="arrow-previous"
+                  markerWidth="10"
+                  markerHeight="8"
+                  refX="8"
+                  refY="4"
+                  orient="auto"
+                >
+                  <path d="M0,0 L10,4 L0,8 z" fill="#b02f6b" />
+                </marker>
+              </defs>
+
+              {visibleEdges.map((edge) => {
+                const from = positioned3DById.get(edge.from)
+                const to = positioned3DById.get(edge.to)
+                if (!from || !to) {
+                  return null
+                }
+
+                const fromPoint = project3D(from.x, from.y, from.z)
+                const toPoint = project3D(to.x, to.y, to.z)
+                const edgeDepth = (from.z + to.z) / 2
+                const depthVisibility = (edgeDepth + 1) / 2
+
+                return (
+                  <line
+                    key={edge.id}
+                    x1={fromPoint.x}
+                    y1={fromPoint.y}
+                    x2={toPoint.x}
+                    y2={toPoint.y}
+                    stroke={edgeColor(edge.type)}
+                    strokeOpacity={0.32 + depthVisibility * 0.58}
+                    strokeWidth={1.2 + depthVisibility * 2}
+                    strokeDasharray={edge.type === 'undirected' ? '7 5' : undefined}
+                    markerEnd={
+                      edge.type === 'next'
+                        ? 'url(#arrow-next)'
+                        : edge.type === 'previous'
+                          ? 'url(#arrow-previous)'
+                          : undefined
+                    }
+                  />
+                )
+              })}
+
+              {positions3D.map(({ node, x, y, z }) => {
+                const tags = node.tagIds
+                  .map((id) => tagById.get(id))
+                  .filter((tag): tag is Tag => Boolean(tag))
+                const point = project3D(x, y, z)
+                const depthVisibility = (z + 1) / 2
+                const radius = NODE_RADIUS * point.scale
+
+                return (
+                  <g
+                    key={node.id}
+                    transform={`translate(${point.x}, ${point.y})`}
+                    onMouseMove={(event) =>
+                      setHover({
+                        nodeId: node.id,
+                        x: event.clientX,
+                        y: event.clientY,
+                      })
+                    }
+                    onMouseEnter={(event) =>
+                      setHover({
+                        nodeId: node.id,
+                        x: event.clientX,
+                        y: event.clientY,
+                      })
+                    }
+                    onMouseLeave={() =>
+                      setHover((current) => (current?.nodeId === node.id ? null : current))
+                    }
+                    onClick={() => openNodeEditor(node.id)}
+                  >
+                    <circle
+                      r={radius}
+                      fill={selectedNodeId === node.id ? 'var(--node-selected)' : 'var(--node-fill)'}
+                      fillOpacity={0.64 + depthVisibility * 0.36}
+                      stroke={tags[0]?.color ?? '#5b6f8a'}
+                      strokeWidth={(selectedNodeId === node.id ? 4 : 3) * point.scale}
+                      className="node-circle"
+                    />
+                    <text
+                      className="node-text"
+                      textAnchor="middle"
+                      y={NODE_TEXT_Y * point.scale}
+                      style={{
+                        fontSize: `${Math.max(8, NODE_FONT_SIZE * point.scale)}px`,
+                        opacity: 0.62 + depthVisibility * 0.38,
+                      }}
                     >
                       {node.name.slice(0, 13)}
                     </text>

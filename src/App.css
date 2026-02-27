@@ -221,7 +221,6 @@ button.danger {
 
 .node-text {
   fill: var(--node-text);
-  font-size: 11px;
   font-weight: 700;
   pointer-events: none;
 }

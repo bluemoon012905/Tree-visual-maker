@@ -45,6 +45,9 @@ type CollapsibleSection = 'project' | 'tags' | 'nodes' | 'edges'
 
 const WIDTH = 980
 const HEIGHT = 680
+const NODE_RADIUS = 26
+const NODE_FONT_SIZE = Math.round(NODE_RADIUS * 0.42)
+const NODE_TEXT_Y = Math.round(NODE_FONT_SIZE * 0.36)
 
 const SAMPLE_DATA: ProjectData = {
   tags: [
@@ -886,13 +889,18 @@ function App() {
                   onClick={() => setSelectedNodeId(node.id)}
                 >
                   <circle
-                    r={26}
+                    r={NODE_RADIUS}
                     fill={selectedNodeId === node.id ? 'var(--node-selected)' : 'var(--node-fill)'}
                     stroke={tags[0]?.color ?? '#5b6f8a'}
                     strokeWidth={selectedNodeId === node.id ? 4 : 3}
                     className="node-circle"
                   />
-                  <text className="node-text" textAnchor="middle" y={4}>
+                  <text
+                    className="node-text"
+                    textAnchor="middle"
+                    y={NODE_TEXT_Y}
+                    style={{ fontSize: `${NODE_FONT_SIZE}px` }}
+                  >
                     {node.name.slice(0, 13)}
                   </text>
                 </g>

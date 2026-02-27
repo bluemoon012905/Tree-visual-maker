@@ -886,7 +886,7 @@ function App() {
                   onClick={() => setSelectedNodeId(node.id)}
                 >
                   <circle
-                    r={22}
+                    r={26}
                     fill={selectedNodeId === node.id ? 'var(--node-selected)' : 'var(--node-fill)'}
                     stroke={tags[0]?.color ?? '#5b6f8a'}
                     strokeWidth={selectedNodeId === node.id ? 4 : 3}

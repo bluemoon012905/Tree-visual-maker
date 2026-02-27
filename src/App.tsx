@@ -746,6 +746,118 @@ function App() {
             </>
           )}
         </section>
+
+        {isNodeEditorOpen && selectedNode && (
+          <section className="panel node-editor">
+            <div className="panel-head">
+              <h2>Node Editor</h2>
+              <button className="secondary" onClick={() => setIsNodeEditorOpen(false)}>
+                Close
+              </button>
+            </div>
+            <>
+              <label>
+                Name
+                <input
+                  value={selectedNode.name}
+                  onChange={(event) => updateNode(selectedNode.id, { name: event.target.value })}
+                />
+              </label>
+
+              <label>
+                Description
+                <textarea
+                  value={selectedNode.description}
+                  rows={3}
+                  onChange={(event) =>
+                    updateNode(selectedNode.id, { description: event.target.value })
+                  }
+                />
+              </label>
+
+              <div>
+                <p className="subhead">Tags</p>
+                <div className="tag-grid">
+                  {project.tags.map((tag) => (
+                    <label key={tag.id} className="tag-pill" style={{ borderColor: tag.color }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedNode.tagIds.includes(tag.id)}
+                        onChange={() => toggleNodeTag(selectedNode.id, tag.id)}
+                      />
+                      {tag.name}
+                    </label>
+                  ))}
+                  {project.tags.length === 0 && <p className="empty">Create tags first.</p>}
+                </div>
+              </div>
+
+              <div>
+                <p className="subhead">Quantitative Stats</p>
+                <div className="stat-list">
+                  {Object.entries(selectedNode.stats.quantitative).map(([key, value]) => (
+                    <div className="stat-row" key={key}>
+                      <span>
+                        {key}: {value}
+                      </span>
+                      <button className="danger" onClick={() => removeQuantitativeStat(key)}>
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                  {Object.keys(selectedNode.stats.quantitative).length === 0 && (
+                    <p className="empty">No quantitative stats.</p>
+                  )}
+                </div>
+                <div className="row">
+                  <input
+                    placeholder="key"
+                    value={quantKey}
+                    onChange={(event) => setQuantKey(event.target.value)}
+                  />
+                  <input
+                    placeholder="value"
+                    value={quantValue}
+                    onChange={(event) => setQuantValue(event.target.value)}
+                  />
+                  <button onClick={addQuantitativeStat}>Add</button>
+                </div>
+              </div>
+
+              <div>
+                <p className="subhead">Qualitative Stats</p>
+                <div className="stat-list">
+                  {Object.entries(selectedNode.stats.qualitative).map(([key, value]) => (
+                    <div className="stat-row" key={key}>
+                      <span>
+                        {key}: {value}
+                      </span>
+                      <button className="danger" onClick={() => removeQualitativeStat(key)}>
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                  {Object.keys(selectedNode.stats.qualitative).length === 0 && (
+                    <p className="empty">No qualitative stats.</p>
+                  )}
+                </div>
+                <div className="row">
+                  <input
+                    placeholder="key"
+                    value={qualKey}
+                    onChange={(event) => setQualKey(event.target.value)}
+                  />
+                  <input
+                    placeholder="value"
+                    value={qualValue}
+                    onChange={(event) => setQualValue(event.target.value)}
+                  />
+                  <button onClick={addQualitativeStat}>Add</button>
+                </div>
+              </div>
+            </>
+          </section>
+        )}
       </aside>
 
       <main className="main-area">
@@ -1115,117 +1227,6 @@ function App() {
           </section>
         )}
 
-        {isNodeEditorOpen && selectedNode && (
-          <section className="panel node-editor">
-            <div className="panel-head">
-              <h2>Node Editor</h2>
-              <button className="secondary" onClick={() => setIsNodeEditorOpen(false)}>
-                Close
-              </button>
-            </div>
-            <>
-              <label>
-                Name
-                <input
-                  value={selectedNode.name}
-                  onChange={(event) => updateNode(selectedNode.id, { name: event.target.value })}
-                />
-              </label>
-
-              <label>
-                Description
-                <textarea
-                  value={selectedNode.description}
-                  rows={3}
-                  onChange={(event) =>
-                    updateNode(selectedNode.id, { description: event.target.value })
-                  }
-                />
-              </label>
-
-              <div>
-                <p className="subhead">Tags</p>
-                <div className="tag-grid">
-                  {project.tags.map((tag) => (
-                    <label key={tag.id} className="tag-pill" style={{ borderColor: tag.color }}>
-                      <input
-                        type="checkbox"
-                        checked={selectedNode.tagIds.includes(tag.id)}
-                        onChange={() => toggleNodeTag(selectedNode.id, tag.id)}
-                      />
-                      {tag.name}
-                    </label>
-                  ))}
-                  {project.tags.length === 0 && <p className="empty">Create tags first.</p>}
-                </div>
-              </div>
-
-              <div>
-                <p className="subhead">Quantitative Stats</p>
-                <div className="stat-list">
-                  {Object.entries(selectedNode.stats.quantitative).map(([key, value]) => (
-                    <div className="stat-row" key={key}>
-                      <span>
-                        {key}: {value}
-                      </span>
-                      <button className="danger" onClick={() => removeQuantitativeStat(key)}>
-                        Remove
-                      </button>
-                    </div>
-                  ))}
-                  {Object.keys(selectedNode.stats.quantitative).length === 0 && (
-                    <p className="empty">No quantitative stats.</p>
-                  )}
-                </div>
-                <div className="row">
-                  <input
-                    placeholder="key"
-                    value={quantKey}
-                    onChange={(event) => setQuantKey(event.target.value)}
-                  />
-                  <input
-                    placeholder="value"
-                    value={quantValue}
-                    onChange={(event) => setQuantValue(event.target.value)}
-                  />
-                  <button onClick={addQuantitativeStat}>Add</button>
-                </div>
-              </div>
-
-              <div>
-                <p className="subhead">Qualitative Stats</p>
-                <div className="stat-list">
-                  {Object.entries(selectedNode.stats.qualitative).map(([key, value]) => (
-                    <div className="stat-row" key={key}>
-                      <span>
-                        {key}: {value}
-                      </span>
-                      <button className="danger" onClick={() => removeQualitativeStat(key)}>
-                        Remove
-                      </button>
-                    </div>
-                  ))}
-                  {Object.keys(selectedNode.stats.qualitative).length === 0 && (
-                    <p className="empty">No qualitative stats.</p>
-                  )}
-                </div>
-                <div className="row">
-                  <input
-                    placeholder="key"
-                    value={qualKey}
-                    onChange={(event) => setQualKey(event.target.value)}
-                  />
-                  <input
-                    placeholder="value"
-                    value={qualValue}
-                    onChange={(event) => setQualValue(event.target.value)}
-                  />
-                  <button onClick={addQualitativeStat}>Add</button>
-                </div>
-              </div>
-            </>
-          </section>
-        )}
       </main>
     </div>
   )

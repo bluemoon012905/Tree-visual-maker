@@ -203,6 +203,12 @@ button.danger {
   align-items: center;
 }
 
+.view-mode-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .graph-shell {
   position: relative;
   background: var(--graph-bg);

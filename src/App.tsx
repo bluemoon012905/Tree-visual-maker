@@ -303,12 +303,10 @@ function App() {
   const [theme, setTheme] = useState<ThemeMode>('turtle-night')
   const [viewMode, setViewMode] = useState<ViewMode>('graph')
   const [project, setProject] = useState<ProjectData>(SAMPLE_DATA)
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(
-    SAMPLE_DATA.nodes[0]?.id ?? null,
-  )
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+  const [isNodeEditorOpen, setIsNodeEditorOpen] = useState(false)
   const [newTagName, setNewTagName] = useState('')
   const [newTagColor, setNewTagColor] = useState('#4577ff')
-  const [newNodeName, setNewNodeName] = useState('')
   const [newEdgeFrom, setNewEdgeFrom] = useState('')
   const [newEdgeTo, setNewEdgeTo] = useState('')
   const [newEdgeType, setNewEdgeType] = useState<EdgeType>('undirected')
@@ -407,14 +405,9 @@ function App() {
   }
 
   function addNode() {
-    const trimmed = newNodeName.trim()
-    if (!trimmed) {
-      return
-    }
-
     const createdNode: NodeData = {
       id: createId('node'),
-      name: trimmed,
+      name: 'New Node',
       tagIds: [],
       stats: { quantitative: {}, qualitative: {} },
       description: '',
@@ -422,7 +415,7 @@ function App() {
 
     setProject((current) => ({ ...current, nodes: [...current.nodes, createdNode] }))
     setSelectedNodeId(createdNode.id)
-    setNewNodeName('')
+    setIsNodeEditorOpen(true)
   }
 
   function updateNode(nodeId: string, patch: Partial<NodeData>) {
@@ -439,7 +432,15 @@ function App() {
       edges: current.edges.filter((edge) => edge.from !== nodeId && edge.to !== nodeId),
     }))
 
+    if (selectedNodeId === nodeId) {
+      setIsNodeEditorOpen(false)
+    }
     setSelectedNodeId((currentSelected) => (currentSelected === nodeId ? null : currentSelected))
+  }
+
+  function openNodeEditor(nodeId: string) {
+    setSelectedNodeId(nodeId)
+    setIsNodeEditorOpen(true)
   }
 
   function toggleNodeTag(nodeId: string, tagId: string) {
@@ -762,19 +763,30 @@ function App() {
                     }}
                   />
                 </label>
-                <button onClick={() => setProject(SAMPLE_DATA)}>Reset to Sample</button>
+                <button
+                  onClick={() => {
+                    setProject(SAMPLE_DATA)
+                    setSelectedNodeId(null)
+                    setIsNodeEditorOpen(false)
+                  }}
+                >
+                  Reset to Sample
+                </button>
               </div>
             )}
           </section>
         </header>
         <section className="panel view-mode-bar">
-          <label className="theme-switcher">
-            View
-            <select value={viewMode} onChange={(event) => setViewMode(event.target.value as ViewMode)}>
-              <option value="graph">Visual</option>
-              <option value="list">List view</option>
-            </select>
-          </label>
+          <div className="view-mode-controls">
+            <label className="theme-switcher">
+              View
+              <select value={viewMode} onChange={(event) => setViewMode(event.target.value as ViewMode)}>
+                <option value="graph">Visual</option>
+                <option value="list">List view</option>
+              </select>
+            </label>
+            <button onClick={addNode}>Add</button>
+          </div>
         </section>
 
         {viewMode === 'graph' ? (
@@ -857,7 +869,7 @@ function App() {
                     onMouseLeave={() =>
                       setHover((current) => (current?.nodeId === node.id ? null : current))
                     }
-                    onClick={() => setSelectedNodeId(node.id)}
+                    onClick={() => openNodeEditor(node.id)}
                   >
                     <circle
                       r={NODE_RADIUS}
@@ -908,21 +920,12 @@ function App() {
         ) : (
           <section className="panel list-view">
             <h2>List View</h2>
-            <div className="row">
-              <input
-                value={newNodeName}
-                onChange={(event) => setNewNodeName(event.target.value)}
-                placeholder="New node name"
-              />
-              <button onClick={addNode}>Add</button>
-            </div>
-
             <div className="list">
               {project.nodes.map((node) => (
                 <div className="list-item" key={node.id}>
                   <button
                     className={selectedNodeId === node.id ? 'secondary active' : 'secondary'}
-                    onClick={() => setSelectedNodeId(node.id)}
+                    onClick={() => openNodeEditor(node.id)}
                   >
                     {node.name}
                   </button>
@@ -936,10 +939,14 @@ function App() {
           </section>
         )}
 
-        <section className="panel node-editor">
-          <h2>Selected Node Editor</h2>
-          {!selectedNode && <p className="empty">Select a node to edit details.</p>}
-          {selectedNode && (
+        {isNodeEditorOpen && selectedNode && (
+          <section className="panel node-editor">
+            <div className="panel-head">
+              <h2>Node Editor</h2>
+              <button className="secondary" onClick={() => setIsNodeEditorOpen(false)}>
+                Close
+              </button>
+            </div>
             <>
               <label>
                 Name
@@ -1041,8 +1048,8 @@ function App() {
                 </div>
               </div>
             </>
-          )}
-        </section>
+          </section>
+        )}
       </main>
     </div>
   )

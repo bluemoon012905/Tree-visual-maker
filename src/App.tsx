@@ -55,9 +55,8 @@ type PositionedNode = {
 }
 
 type ThemeMode = 'light' | 'turtle-night'
-type ViewMode = 'graph' | 'graph3d' | 'list'
+type ViewMode = 'graph' | 'list'
 type CollapsibleSection = 'project' | 'tags' | 'stats'
-type PositionedNode3D = PositionedNode & { z: number }
 type ViewportState = { scale: number; tx: number; ty: number }
 
 const WIDTH = 980
@@ -698,19 +697,6 @@ function computeLayout(nodes: NodeData[], edges: EdgeData[]): PositionedNode[] {
   return state.map((item) => ({ node: item.node, x: item.x, y: item.y }))
 }
 
-function depthScale(z: number) {
-  return 0.72 + ((z + 1) / 2) * 0.62
-}
-
-function project3D(x: number, y: number, z: number) {
-  const scale = depthScale(z)
-  return {
-    x: WIDTH / 2 + (x - WIDTH / 2) * scale,
-    y: HEIGHT / 2 + (y - HEIGHT / 2) * scale,
-    scale,
-  }
-}
-
 function segmentsIntersect(
   a1: { x: number; y: number },
   a2: { x: number; y: number },
@@ -903,16 +889,6 @@ function App() {
       }),
     [manualNodePositions, positions],
   )
-  const positions3D = useMemo<PositionedNode3D[]>(
-    () =>
-      interactivePositions
-        .map((item) => ({
-          ...item,
-          z: hashToUnit(`${item.node.id}:z`) * 2 - 1,
-        }))
-        .sort((a, b) => a.z - b.z),
-    [interactivePositions],
-  )
 
   const selectedNode = useMemo(
     () => project.nodes.find((node) => node.id === selectedNodeId) ?? null,
@@ -930,10 +906,6 @@ function App() {
   const positionedById = useMemo(
     () => new Map(interactivePositions.map((item) => [item.node.id, item])),
     [interactivePositions],
-  )
-  const positioned3DById = useMemo(
-    () => new Map(positions3D.map((item) => [item.node.id, item])),
-    [positions3D],
   )
   const currentProjectSnapshot = useMemo(
     () => JSON.stringify(sortProjectForExport(project)),
@@ -1921,7 +1893,6 @@ function App() {
               View
               <select value={viewMode} onChange={(event) => setViewMode(event.target.value as ViewMode)}>
                 <option value="graph">Visual</option>
-                <option value="graph3d">3D</option>
                 <option value="list">List view</option>
               </select>
             </label>
@@ -2076,172 +2047,6 @@ function App() {
                         textAnchor="middle"
                         y={NODE_TEXT_Y}
                         style={{ fontSize: `${NODE_FONT_SIZE}px` }}
-                      >
-                        {node.name.slice(0, 13)}
-                      </text>
-                    </g>
-                  )
-                })}
-              </g>
-            </svg>
-
-            {hoveredNode && hover && (
-              <div className="tooltip" style={{ left: hover.x + 14, top: hover.y + 14 }}>
-                <h3>{hoveredNode.name}</h3>
-                {hoveredNodeStatLines.map((statLine) => (
-                  <p key={statLine.id} style={statLine.color ? { color: statLine.color } : undefined}>
-                    {statLine.text}
-                  </p>
-                ))}
-                {hoveredTagStatLines.map((statLine) => (
-                  <p key={statLine.id} style={{ color: statLine.color }}>
-                    {statLine.text}
-                  </p>
-                ))}
-                {hoveredNodeStatLines.length === 0 && hoveredTagStatLines.length === 0 && <p>No stats.</p>}
-                <p>{hoveredNode.description || 'No description.'}</p>
-                <p>
-                  Tags:{' '}
-                  {hoveredNode.tagIds
-                    .map((id) => tagById.get(id)?.name)
-                    .filter(Boolean)
-                    .join(', ') || 'None'}
-                </p>
-              </div>
-            )}
-          </section>
-        ) : viewMode === 'graph3d' ? (
-          <section className="graph-shell">
-            <svg
-              ref={svgRef}
-              viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-              role="img"
-              aria-label="Skill tree 3D graph"
-              onMouseDown={(event) => handleGraphMouseDown(event.clientX, event.clientY)}
-              onMouseMove={(event) => handleGraphMouseMove(event.clientX, event.clientY)}
-              onWheel={(event) => {
-                event.preventDefault()
-                handleGraphWheel(event.clientX, event.clientY, event.deltaY)
-              }}
-            >
-              <defs>
-                <marker
-                  id="arrow-next"
-                  markerWidth="10"
-                  markerHeight="8"
-                  refX="8"
-                  refY="4"
-                  orient="auto"
-                >
-                  <path d="M0,0 L10,4 L0,8 z" fill="#0c63e7" />
-                </marker>
-                <marker
-                  id="arrow-previous"
-                  markerWidth="10"
-                  markerHeight="8"
-                  refX="8"
-                  refY="4"
-                  orient="auto"
-                >
-                  <path d="M0,0 L10,4 L0,8 z" fill="#b02f6b" />
-                </marker>
-              </defs>
-
-              <g transform={`translate(${viewport.tx}, ${viewport.ty}) scale(${viewport.scale})`}>
-                {visibleEdges.map((edge) => {
-                  const from = positioned3DById.get(edge.from)
-                  const to = positioned3DById.get(edge.to)
-                  if (!from || !to) {
-                    return null
-                  }
-
-                  const fromPoint = project3D(from.x, from.y, from.z)
-                  const toPoint = project3D(to.x, to.y, to.z)
-                  const edgeDepth = (from.z + to.z) / 2
-                  const depthVisibility = (edgeDepth + 1) / 2
-
-                  return (
-                    <line
-                      key={edge.id}
-                      x1={fromPoint.x}
-                      y1={fromPoint.y}
-                      x2={toPoint.x}
-                      y2={toPoint.y}
-                      stroke={edgeColor(edge.type)}
-                      strokeOpacity={0.32 + depthVisibility * 0.58}
-                      strokeWidth={1.2 + depthVisibility * 2}
-                      strokeDasharray={edge.type === 'undirected' ? '7 5' : undefined}
-                      markerEnd={
-                        edge.type === 'next'
-                          ? 'url(#arrow-next)'
-                          : edge.type === 'previous'
-                            ? 'url(#arrow-previous)'
-                            : undefined
-                      }
-                    />
-                  )
-                })}
-
-                {positions3D.map(({ node, x, y, z }) => {
-                  const visibleTags = node.tagIds
-                    .map((id) => tagById.get(id))
-                    .filter((tag): tag is Tag => {
-                      if (!tag) return false
-                      return tag.visible
-                    })
-                  const point = project3D(x, y, z)
-                  const depthVisibility = (z + 1) / 2
-                  const radius = NODE_RADIUS * point.scale
-
-                  return (
-                    <g
-                      key={node.id}
-                      transform={`translate(${point.x}, ${point.y})`}
-                      onMouseDown={(event) => {
-                        event.stopPropagation()
-                        beginNodeDrag(node.id, event.clientX, event.clientY)
-                      }}
-                      onMouseMove={(event) =>
-                        setHover({
-                          nodeId: node.id,
-                          x: event.clientX,
-                          y: event.clientY,
-                        })
-                      }
-                      onMouseEnter={(event) =>
-                        setHover({
-                          nodeId: node.id,
-                          x: event.clientX,
-                          y: event.clientY,
-                        })
-                      }
-                      onMouseLeave={() =>
-                        setHover((current) => (current?.nodeId === node.id ? null : current))
-                      }
-                      onClick={() => {
-                        if (movedDuringDragRef.current) {
-                          movedDuringDragRef.current = false
-                          return
-                        }
-                        openNodeEditor(node.id)
-                      }}
-                    >
-                      <circle
-                        r={radius}
-                        fill={selectedNodeId === node.id ? 'var(--node-selected)' : 'var(--node-fill)'}
-                        fillOpacity={0.64 + depthVisibility * 0.36}
-                        stroke={visibleTags[0]?.color ?? '#5b6f8a'}
-                        strokeWidth={(selectedNodeId === node.id ? 4 : 3) * point.scale}
-                        className="node-circle"
-                      />
-                      <text
-                        className="node-text"
-                        textAnchor="middle"
-                        y={NODE_TEXT_Y * point.scale}
-                        style={{
-                          fontSize: `${Math.max(8, NODE_FONT_SIZE * point.scale)}px`,
-                          opacity: 0.62 + depthVisibility * 0.38,
-                        }}
                       >
                         {node.name.slice(0, 13)}
                       </text>

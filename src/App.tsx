@@ -42,7 +42,7 @@ type PositionedNode = {
 
 type ThemeMode = 'light' | 'turtle-night'
 type ViewMode = 'graph' | 'graph3d' | 'list'
-type CollapsibleSection = 'project' | 'tags' | 'edges'
+type CollapsibleSection = 'project' | 'tags'
 type PositionedNode3D = PositionedNode & { z: number }
 
 const WIDTH = 980
@@ -321,7 +321,6 @@ function App() {
   const [isNodeEditorOpen, setIsNodeEditorOpen] = useState(false)
   const [newTagName, setNewTagName] = useState('')
   const [newTagColor, setNewTagColor] = useState('#4577ff')
-  const [newEdgeFrom, setNewEdgeFrom] = useState('')
   const [newEdgeTo, setNewEdgeTo] = useState('')
   const [newEdgeType, setNewEdgeType] = useState<EdgeType>('undirected')
   const [quantKey, setQuantKey] = useState('')
@@ -332,7 +331,6 @@ function App() {
   const [collapsedSections, setCollapsedSections] = useState<Record<CollapsibleSection, boolean>>({
     project: false,
     tags: false,
-    edges: false,
   })
 
   const visibleTagIds = useMemo(
@@ -375,6 +373,12 @@ function App() {
     () => project.nodes.find((node) => node.id === selectedNodeId) ?? null,
     [project.nodes, selectedNodeId],
   )
+  const selectedNodeEdges = useMemo(() => {
+    if (!selectedNode) {
+      return []
+    }
+    return project.edges.filter((edge) => edge.from === selectedNode.id || edge.to === selectedNode.id)
+  }, [project.edges, selectedNode])
 
   const nodesById = useMemo(() => new Map(project.nodes.map((node) => [node.id, node])), [project.nodes])
   const tagById = useMemo(() => new Map(project.tags.map((tag) => [tag.id, tag])), [project.tags])
@@ -488,18 +492,19 @@ function App() {
   }
 
   function addEdge() {
-    if (!newEdgeFrom || !newEdgeTo || newEdgeFrom === newEdgeTo) {
+    if (!selectedNode || !newEdgeTo || newEdgeTo === selectedNode.id) {
       return
     }
 
     const edge: EdgeData = {
       id: createId('edge'),
-      from: newEdgeFrom,
+      from: selectedNode.id,
       to: newEdgeTo,
       type: newEdgeType,
     }
 
     setProject((current) => ({ ...current, edges: [...current.edges, edge] }))
+    setNewEdgeTo('')
   }
 
   function updateEdge(edgeId: string, patch: Partial<EdgeData>) {
@@ -678,75 +683,6 @@ function App() {
           )}
         </section>
 
-        <section className="panel">
-          <div className="panel-head">
-            <h2>Edges</h2>
-            <button
-              className="secondary collapse-toggle"
-              onClick={() => toggleSection('edges')}
-              aria-label={collapsedSections.edges ? 'Expand edges section' : 'Collapse edges section'}
-            >
-              {collapsedSections.edges ? '▾' : '▴'}
-            </button>
-          </div>
-          {!collapsedSections.edges && (
-            <>
-              <div className="row edge-form">
-                <select value={newEdgeFrom} onChange={(event) => setNewEdgeFrom(event.target.value)}>
-                  <option value="">From node</option>
-                  {project.nodes.map((node) => (
-                    <option key={node.id} value={node.id}>
-                      {node.name}
-                    </option>
-                  ))}
-                </select>
-                <select value={newEdgeTo} onChange={(event) => setNewEdgeTo(event.target.value)}>
-                  <option value="">To node</option>
-                  {project.nodes.map((node) => (
-                    <option key={node.id} value={node.id}>
-                      {node.name}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={newEdgeType}
-                  onChange={(event) => setNewEdgeType(event.target.value as EdgeType)}
-                >
-                  <option value="next">next</option>
-                  <option value="previous">previous</option>
-                  <option value="undirected">undirected</option>
-                </select>
-                <button onClick={addEdge}>Add</button>
-              </div>
-
-              <div className="list">
-                {project.edges.map((edge) => (
-                  <div key={edge.id} className="edge-row">
-                    <span>
-                      {(nodesById.get(edge.from)?.name ?? edge.from) + ' -> ' +
-                        (nodesById.get(edge.to)?.name ?? edge.to)}
-                    </span>
-                    <select
-                      value={edge.type}
-                      onChange={(event) =>
-                        updateEdge(edge.id, { type: event.target.value as EdgeType })
-                      }
-                    >
-                      <option value="next">next</option>
-                      <option value="previous">previous</option>
-                      <option value="undirected">undirected</option>
-                    </select>
-                    <button className="danger" onClick={() => deleteEdge(edge.id)}>
-                      Delete
-                    </button>
-                  </div>
-                ))}
-                {project.edges.length === 0 && <p className="empty">No edges yet.</p>}
-              </div>
-            </>
-          )}
-        </section>
-
         {isNodeEditorOpen && selectedNode && (
           <section className="panel node-editor">
             <div className="panel-head">
@@ -789,6 +725,60 @@ function App() {
                     </label>
                   ))}
                   {project.tags.length === 0 && <p className="empty">Create tags first.</p>}
+                </div>
+              </div>
+
+              <div>
+                <p className="subhead">Edges</p>
+                <div className="row edge-form">
+                  <select value={newEdgeTo} onChange={(event) => setNewEdgeTo(event.target.value)}>
+                    <option value="">Connect to node</option>
+                    {project.nodes
+                      .filter((node) => node.id !== selectedNode.id)
+                      .map((node) => (
+                        <option key={node.id} value={node.id}>
+                          {node.name}
+                        </option>
+                      ))}
+                  </select>
+                  <select
+                    value={newEdgeType}
+                    onChange={(event) => setNewEdgeType(event.target.value as EdgeType)}
+                  >
+                    <option value="next">next</option>
+                    <option value="previous">previous</option>
+                    <option value="undirected">undirected</option>
+                  </select>
+                  <button onClick={addEdge}>Add</button>
+                </div>
+
+                <div className="list">
+                  {selectedNodeEdges.map((edge) => {
+                    const isOutgoing = edge.from === selectedNode.id
+                    const otherNodeId = isOutgoing ? edge.to : edge.from
+                    const otherNodeName = nodesById.get(otherNodeId)?.name ?? otherNodeId
+                    const directionLabel = isOutgoing ? '->' : '<-'
+
+                    return (
+                      <div key={edge.id} className="edge-row">
+                        <span>{`${directionLabel} ${otherNodeName}`}</span>
+                        <select
+                          value={edge.type}
+                          onChange={(event) =>
+                            updateEdge(edge.id, { type: event.target.value as EdgeType })
+                          }
+                        >
+                          <option value="next">next</option>
+                          <option value="previous">previous</option>
+                          <option value="undirected">undirected</option>
+                        </select>
+                        <button className="danger" onClick={() => deleteEdge(edge.id)}>
+                          Delete
+                        </button>
+                      </div>
+                    )
+                  })}
+                  {selectedNodeEdges.length === 0 && <p className="empty">No edges yet.</p>}
                 </div>
               </div>
 

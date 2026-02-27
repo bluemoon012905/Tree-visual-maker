@@ -1536,24 +1536,26 @@ function App() {
                         Delete
                       </button>
                     </div>
-                    <div className="row tag-root-row">
-                      <span className="subhead">Root node</span>
-                      <select
-                        value={tag.rootNodeId ?? ''}
-                        onChange={(event) =>
-                          updateTag(tag.id, { rootNodeId: event.target.value || null })
-                        }
-                      >
-                        <option value="">None</option>
-                        {project.nodes
-                          .filter((node) => node.tagIds.includes(tag.id))
-                          .map((node) => (
-                            <option key={node.id} value={node.id}>
-                              {node.name}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
+                    {showTagStatsInTagsPanel && (
+                      <div className="row tag-root-row">
+                        <span className="subhead">Root node</span>
+                        <select
+                          value={tag.rootNodeId ?? ''}
+                          onChange={(event) =>
+                            updateTag(tag.id, { rootNodeId: event.target.value || null })
+                          }
+                        >
+                          <option value="">None</option>
+                          {project.nodes
+                            .filter((node) => node.tagIds.includes(tag.id))
+                            .map((node) => (
+                              <option key={node.id} value={node.id}>
+                                {node.name}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                    )}
                     {showTagStatsInTagsPanel && <div className="tag-stats">
                       <div>
                         <p className="subhead">Tag Quant</p>

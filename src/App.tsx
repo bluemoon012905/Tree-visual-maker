@@ -867,6 +867,9 @@ function untangleLayout(initial: PositionedNode[], edges: EdgeData[]) {
 function App() {
   const [theme, setTheme] = useState<ThemeMode>('turtle-night')
   const [viewMode, setViewMode] = useState<ViewMode>('graph')
+  const [windowWidth, setWindowWidth] = useState(
+    typeof window !== 'undefined' ? window.innerWidth : 1440,
+  )
   const [sidebarWidth, setSidebarWidth] = useState(430)
   const [autoSaveView, setAutoSaveView] = useState(false)
   const [viewport, setViewport] = useState<ViewportState>({ scale: 1, tx: 0, ty: 0 })
@@ -975,6 +978,11 @@ function App() {
   const isPanningRef = useRef(false)
   const panStartRef = useRef<{ x: number; y: number } | null>(null)
   const movedDuringDragRef = useRef(false)
+  const minSidebarWidth = 320
+  const maxSidebarWidth = useMemo(
+    () => Math.max(620, Math.min(Math.floor(windowWidth * 0.8), windowWidth - 180)),
+    [windowWidth],
+  )
   const statStyleMap = useMemo(
     () => new Map(project.statStyles.map((style) => [`${style.kind}:${style.key}`, style.color])),
     [project.statStyles],
@@ -1020,6 +1028,17 @@ function App() {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
   }, [theme])
+
+  useEffect(() => {
+    const onResize = () => {
+      const nextWidth = window.innerWidth
+      const nextMax = Math.max(620, Math.min(Math.floor(nextWidth * 0.8), nextWidth - 180))
+      setWindowWidth(nextWidth)
+      setSidebarWidth((current) => Math.max(minSidebarWidth, Math.min(nextMax, current)))
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   useEffect(() => {
     if (!autoSaveView) {
@@ -2015,11 +2034,15 @@ function App() {
               Left Width
               <input
                 type="range"
-                min={320}
-                max={620}
+                min={minSidebarWidth}
+                max={maxSidebarWidth}
                 step={10}
                 value={sidebarWidth}
-                onChange={(event) => setSidebarWidth(Number(event.target.value))}
+                onChange={(event) =>
+                  setSidebarWidth(
+                    Math.max(minSidebarWidth, Math.min(maxSidebarWidth, Number(event.target.value))),
+                  )
+                }
               />
             </label>
             <button onClick={addNode}>Add</button>

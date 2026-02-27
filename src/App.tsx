@@ -171,10 +171,6 @@ function edgeColor(type: EdgeType) {
   return '#6f7f90'
 }
 
-function isHexColor(value: string) {
-  return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value.trim())
-}
-
 function normalizeProject(input: ProjectData): ProjectData {
   const tags = (input.tags ?? []).map((tag) => {
     const quantitative: Record<string, number> = {}
@@ -388,7 +384,6 @@ function App() {
   const [isNodeEditorOpen, setIsNodeEditorOpen] = useState(false)
   const [newTagName, setNewTagName] = useState('')
   const [newTagColor, setNewTagColor] = useState('#4577ff')
-  const [newTagColorHex, setNewTagColorHex] = useState('#4577ff')
   const [tagQuantDrafts, setTagQuantDrafts] = useState<Record<string, { key: string; value: string }>>({})
   const [tagQualDrafts, setTagQualDrafts] = useState<Record<string, { key: string; value: string }>>({})
   const [newEdgeTo, setNewEdgeTo] = useState('')
@@ -826,25 +821,7 @@ function App() {
                   className="color-input"
                   value={newTagColor}
                   type="color"
-                  onChange={(event) => {
-                    setNewTagColor(event.target.value)
-                    setNewTagColorHex(event.target.value)
-                  }}
-                />
-                <input
-                  className="hex-input"
-                  value={newTagColorHex}
-                  onChange={(event) => setNewTagColorHex(event.target.value)}
-                  onBlur={() => {
-                    if (isHexColor(newTagColorHex)) {
-                      const normalized = newTagColorHex.trim().toLowerCase()
-                      setNewTagColor(normalized)
-                      setNewTagColorHex(normalized)
-                      return
-                    }
-                    setNewTagColorHex(newTagColor)
-                  }}
-                  placeholder="#4577ff"
+                  onChange={(event) => setNewTagColor(event.target.value)}
                 />
                 <button onClick={addTag}>Add</button>
               </div>
@@ -870,21 +847,6 @@ function App() {
                         value={tag.color}
                         onChange={(event) => updateTag(tag.id, { color: event.target.value })}
                         title="Tag color"
-                      />
-                      <input
-                        className="hex-input"
-                        key={`${tag.id}:${tag.color}`}
-                        defaultValue={tag.color}
-                        onBlur={(event) => {
-                          const value = event.target.value.trim().toLowerCase()
-                          if (!isHexColor(value)) {
-                            event.currentTarget.value = tag.color
-                            return
-                          }
-                          updateTag(tag.id, { color: value })
-                          event.currentTarget.value = value
-                        }}
-                        placeholder="#4577ff"
                       />
                       <input
                         className="color-input"

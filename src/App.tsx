@@ -874,9 +874,9 @@ function App() {
   const [autoSaveView, setAutoSaveView] = useState(false)
   const [viewport, setViewport] = useState<ViewportState>({ scale: 1, tx: 0, ty: 0 })
   const [manualNodePositions, setManualNodePositions] = useState<Record<string, { x: number; y: number }>>({})
-  const [project, setProject] = useState<ProjectData>(SAMPLE_DATA)
+  const [project, setProject] = useState<ProjectData>(BLANK_PROJECT)
   const [loadedProjectSnapshot, setLoadedProjectSnapshot] = useState(() =>
-    JSON.stringify(sortProjectForExport(SAMPLE_DATA)),
+    JSON.stringify(sortProjectForExport(BLANK_PROJECT)),
   )
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [isNodeEditorOpen, setIsNodeEditorOpen] = useState(false)

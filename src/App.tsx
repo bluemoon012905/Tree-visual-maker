@@ -39,6 +39,11 @@ type ProjectData = {
   nodes: NodeData[]
   edges: EdgeData[]
   statStyles: StatStyle[]
+  viewState: {
+    viewport: ViewportState
+    manualNodePositions: Record<string, { x: number; y: number }>
+    showRootNodesOnly: boolean
+  }
 }
 
 type StatStyle = {
@@ -367,6 +372,11 @@ const SAMPLE_DATA: ProjectData = {
     { id: 'style_mana', key: 'mana', kind: 'quantitative', color: '#88c9ff' },
     { id: 'style_defense', key: 'defense', kind: 'quantitative', color: '#9be3a8' },
   ],
+  viewState: {
+    viewport: { scale: 1, tx: 0, ty: 0 },
+    manualNodePositions: {},
+    showRootNodesOnly: false,
+  },
 }
 
 const STARTER_TEMPLATE: ProjectData = {
@@ -446,6 +456,11 @@ const STARTER_TEMPLATE: ProjectData = {
     { id: 'edge_gamma', from: 'node_gamma_root', to: 'node_gamma_child', type: 'next' },
   ],
   statStyles: [{ id: 'style_damage', key: 'damage', kind: 'quantitative', color: '#ff9f9f' }],
+  viewState: {
+    viewport: { scale: 1, tx: 0, ty: 0 },
+    manualNodePositions: {},
+    showRootNodesOnly: false,
+  },
 }
 
 const BLANK_PROJECT: ProjectData = {
@@ -453,6 +468,11 @@ const BLANK_PROJECT: ProjectData = {
   nodes: [],
   edges: [],
   statStyles: [],
+  viewState: {
+    viewport: { scale: 1, tx: 0, ty: 0 },
+    manualNodePositions: {},
+    showRootNodesOnly: false,
+  },
 }
 
 function createId(prefix: string) {
@@ -567,12 +587,35 @@ function normalizeProject(input: ProjectData): ProjectData {
     color: String(style.color ?? '#9fb2d9'),
   }))
 
+  const rawManualPositions = input.viewState?.manualNodePositions ?? {}
+  const manualNodePositions = Object.fromEntries(
+    Object.entries(rawManualPositions)
+      .filter(([nodeId]) => nodeIds.has(nodeId))
+      .map(([nodeId, point]) => [
+        nodeId,
+        {
+          x: Number.isFinite(Number(point?.x)) ? Number(point.x) : WIDTH / 2,
+          y: Number.isFinite(Number(point?.y)) ? Number(point.y) : HEIGHT / 2,
+        },
+      ]),
+  ) as Record<string, { x: number; y: number }>
+  const rawViewport = input.viewState?.viewport
+  const viewState = {
+    viewport: {
+      scale: Math.max(0.45, Math.min(3.2, Number(rawViewport?.scale) || 1)),
+      tx: Number(rawViewport?.tx) || 0,
+      ty: Number(rawViewport?.ty) || 0,
+    },
+    manualNodePositions,
+    showRootNodesOnly: Boolean(input.viewState?.showRootNodesOnly ?? false),
+  }
+
   const normalizedTags = tags.map((tag) => ({
     ...tag,
     rootNodeId: tag.rootNodeId && nodeIds.has(tag.rootNodeId) ? tag.rootNodeId : null,
   }))
 
-  return { tags: normalizedTags, nodes, edges, statStyles }
+  return { tags: normalizedTags, nodes, edges, statStyles, viewState }
 }
 
 function sortProjectForExport(project: ProjectData): ProjectData {
@@ -605,8 +648,19 @@ function sortProjectForExport(project: ProjectData): ProjectData {
     }))
   const edges = [...project.edges].sort((a, b) => a.id.localeCompare(b.id))
   const statStyles = [...project.statStyles].sort((a, b) => a.id.localeCompare(b.id))
+  const viewState = {
+    viewport: {
+      scale: project.viewState.viewport.scale,
+      tx: project.viewState.viewport.tx,
+      ty: project.viewState.viewport.ty,
+    },
+    manualNodePositions: Object.fromEntries(
+      Object.entries(project.viewState.manualNodePositions).sort(([a], [b]) => a.localeCompare(b)),
+    ),
+    showRootNodesOnly: project.viewState.showRootNodesOnly,
+  }
 
-  return { tags, nodes, edges, statStyles }
+  return { tags, nodes, edges, statStyles, viewState }
 }
 
 function computeLayout(nodes: NodeData[], edges: EdgeData[]): PositionedNode[] {
@@ -814,6 +868,7 @@ function App() {
   const [theme, setTheme] = useState<ThemeMode>('turtle-night')
   const [viewMode, setViewMode] = useState<ViewMode>('graph')
   const [sidebarWidth, setSidebarWidth] = useState(430)
+  const [autoSaveView, setAutoSaveView] = useState(false)
   const [viewport, setViewport] = useState<ViewportState>({ scale: 1, tx: 0, ty: 0 })
   const [manualNodePositions, setManualNodePositions] = useState<Record<string, { x: number; y: number }>>({})
   const [project, setProject] = useState<ProjectData>(SAMPLE_DATA)
@@ -967,6 +1022,21 @@ function App() {
   }, [theme])
 
   useEffect(() => {
+    if (!autoSaveView) {
+      return
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setProject((current) => ({
+      ...current,
+      viewState: {
+        viewport,
+        manualNodePositions,
+        showRootNodesOnly,
+      },
+    }))
+  }, [autoSaveView, manualNodePositions, showRootNodesOnly, viewport])
+
+  useEffect(() => {
     const endInteractions = () => {
       dragNodeIdRef.current = null
       isPanningRef.current = false
@@ -1064,6 +1134,23 @@ function App() {
     }))
   }
 
+  function applyProjectViewState(nextProject: ProjectData) {
+    setViewport(nextProject.viewState.viewport)
+    setManualNodePositions(nextProject.viewState.manualNodePositions)
+    setShowRootNodesOnly(nextProject.viewState.showRootNodesOnly)
+  }
+
+  function saveCurrentView() {
+    setProject((current) => ({
+      ...current,
+      viewState: {
+        viewport,
+        manualNodePositions,
+        showRootNodesOnly,
+      },
+    }))
+  }
+
   function toggleSection(section: CollapsibleSection) {
     setCollapsedSections((current) => ({
       ...current,
@@ -1106,6 +1193,7 @@ function App() {
       })),
       edges: current.edges,
       statStyles: current.statStyles,
+      viewState: current.viewState,
     }))
     setTagQuantDrafts((current) => {
       const next = { ...current }
@@ -1258,6 +1346,7 @@ function App() {
       nodes: current.nodes.filter((node) => node.id !== nodeId),
       edges: current.edges.filter((edge) => edge.from !== nodeId && edge.to !== nodeId),
       statStyles: current.statStyles,
+      viewState: current.viewState,
     }))
 
     if (selectedNodeId === nodeId) {
@@ -1422,8 +1511,7 @@ function App() {
       setProject(normalized)
       setSelectedNodeId(normalized.nodes[0]?.id ?? null)
       setLoadedProjectSnapshot(JSON.stringify(sortProjectForExport(normalized)))
-      setManualNodePositions({})
-      setViewport({ scale: 1, tx: 0, ty: 0 })
+      applyProjectViewState(normalized)
     } catch {
       alert('Failed to import JSON. Check file format.')
     }
@@ -1444,9 +1532,7 @@ function App() {
     setLoadedProjectSnapshot(JSON.stringify(sortProjectForExport(template)))
     setSelectedNodeId(null)
     setIsNodeEditorOpen(false)
-    setShowRootNodesOnly(false)
-    setManualNodePositions({})
-    setViewport({ scale: 1, tx: 0, ty: 0 })
+    applyProjectViewState(template)
   }
 
   return (
@@ -1908,6 +1994,18 @@ function App() {
               </label>
             )}
             {viewMode !== 'list' && <button onClick={untangleCurrentView}>Untangle</button>}
+            {viewMode !== 'list' && <button onClick={saveCurrentView}>Save Current View</button>}
+            {viewMode !== 'list' && (
+              <label className="theme-switcher">
+                Auto Save View
+                <input
+                  className="compact-check"
+                  type="checkbox"
+                  checked={autoSaveView}
+                  onChange={(event) => setAutoSaveView(event.target.checked)}
+                />
+              </label>
+            )}
             {viewMode !== 'list' && (
               <button className="secondary" onClick={() => setViewport({ scale: 1, tx: 0, ty: 0 })}>
                 Reset View

@@ -8,6 +8,7 @@ type Tag = {
   name: string
   color: string
   visible: boolean
+  rootNodeId: string | null
   statColor: string
   stats: {
     quantitative: Record<string, number>
@@ -63,6 +64,7 @@ const SAMPLE_DATA: ProjectData = {
       name: 'Magic Damage',
       color: '#2657ff',
       visible: true,
+      rootNodeId: 'node_spark',
       statColor: '#93a9ff',
       stats: { quantitative: { bonusPower: 12 }, qualitative: { attunement: 'Arcane' } },
     },
@@ -71,6 +73,7 @@ const SAMPLE_DATA: ProjectData = {
       name: 'Fire Element',
       color: '#ef5b2f',
       visible: true,
+      rootNodeId: 'node_fireball',
       statColor: '#ffb08b',
       stats: { quantitative: { burnChance: 18 }, qualitative: { element: 'Fire' } },
     },
@@ -79,6 +82,7 @@ const SAMPLE_DATA: ProjectData = {
       name: 'Ranged',
       color: '#23ad77',
       visible: true,
+      rootNodeId: 'node_spark',
       statColor: '#98ebcc',
       stats: { quantitative: {}, qualitative: {} },
     },
@@ -87,6 +91,7 @@ const SAMPLE_DATA: ProjectData = {
       name: 'Support',
       color: '#bb53db',
       visible: true,
+      rootNodeId: 'node_flame_aura',
       statColor: '#e2b1f1',
       stats: { quantitative: {}, qualitative: {} },
     },
@@ -189,6 +194,7 @@ function normalizeProject(input: ProjectData): ProjectData {
       name: String(tag.name ?? 'New Tag'),
       color: String(tag.color ?? '#4577ff'),
       visible: Boolean(tag.visible ?? true),
+      rootNodeId: tag.rootNodeId ? String(tag.rootNodeId) : null,
       statColor: String(tag.statColor ?? '#9fb2d9'),
       stats: {
         quantitative,
@@ -239,7 +245,12 @@ function normalizeProject(input: ProjectData): ProjectData {
           : 'undirected',
     }))
 
-  return { tags, nodes, edges }
+  const normalizedTags = tags.map((tag) => ({
+    ...tag,
+    rootNodeId: tag.rootNodeId && nodeIds.has(tag.rootNodeId) ? tag.rootNodeId : null,
+  }))
+
+  return { tags: normalizedTags, nodes, edges }
 }
 
 function sortProjectForExport(project: ProjectData): ProjectData {
@@ -393,6 +404,7 @@ function App() {
   const [qualKey, setQualKey] = useState('')
   const [qualValue, setQualValue] = useState('')
   const [hover, setHover] = useState<{ nodeId: string; x: number; y: number } | null>(null)
+  const [showRootNodesOnly, setShowRootNodesOnly] = useState(false)
   const [collapsedSections, setCollapsedSections] = useState<Record<CollapsibleSection, boolean>>({
     project: false,
     tags: false,
@@ -405,11 +417,23 @@ function App() {
 
   const visibleNodes = useMemo(() => {
     const hasVisibleTagFilter = visibleTagIds.size > 0
-    if (!hasVisibleTagFilter) {
-      return project.nodes
+    const tagFilteredNodes = hasVisibleTagFilter
+      ? project.nodes.filter((node) => node.tagIds.some((tagId) => visibleTagIds.has(tagId)))
+      : project.nodes
+
+    if (!showRootNodesOnly) {
+      return tagFilteredNodes
     }
-    return project.nodes.filter((node) => node.tagIds.some((tagId) => visibleTagIds.has(tagId)))
-  }, [project.nodes, visibleTagIds])
+
+    const rootNodeIds = new Set(
+      project.tags
+        .filter((tag) => tag.visible && tag.rootNodeId)
+        .map((tag) => tag.rootNodeId)
+        .filter((id): id is string => Boolean(id)),
+    )
+
+    return tagFilteredNodes.filter((node) => rootNodeIds.has(node.id))
+  }, [project.nodes, project.tags, showRootNodesOnly, visibleTagIds])
 
   const visibleNodeIds = useMemo(() => new Set(visibleNodes.map((node) => node.id)), [visibleNodes])
 
@@ -506,6 +530,7 @@ function App() {
       name: trimmed,
       color: newTagColor,
       visible: true,
+      rootNodeId: null,
       statColor: newTagColor,
       stats: { quantitative: {}, qualitative: {} },
     }
@@ -633,7 +658,9 @@ function App() {
 
   function deleteNode(nodeId: string) {
     setProject((current) => ({
-      ...current,
+      tags: current.tags.map((tag) =>
+        tag.rootNodeId === nodeId ? { ...tag, rootNodeId: null } : tag,
+      ),
       nodes: current.nodes.filter((node) => node.id !== nodeId),
       edges: current.edges.filter((edge) => edge.from !== nodeId && edge.to !== nodeId),
     }))
@@ -650,19 +677,28 @@ function App() {
   }
 
   function toggleNodeTag(nodeId: string, tagId: string) {
-    setProject((current) => ({
-      ...current,
-      nodes: current.nodes.map((node) => {
+    setProject((current) => {
+      let removed = false
+      const nodes = current.nodes.map((node) => {
         if (node.id !== nodeId) {
           return node
         }
         const hasTag = node.tagIds.includes(tagId)
+        removed = hasTag
         return {
           ...node,
           tagIds: hasTag ? node.tagIds.filter((id) => id !== tagId) : [...node.tagIds, tagId],
         }
-      }),
-    }))
+      })
+
+      const tags = removed
+        ? current.tags.map((tag) =>
+            tag.id === tagId && tag.rootNodeId === nodeId ? { ...tag, rootNodeId: null } : tag,
+          )
+        : current.tags
+
+      return { ...current, nodes, tags }
+    })
   }
 
   function addEdge() {
@@ -858,6 +894,24 @@ function App() {
                       <button className="danger" onClick={() => deleteTag(tag.id)}>
                         Delete
                       </button>
+                    </div>
+                    <div className="row tag-root-row">
+                      <span className="subhead">Root node</span>
+                      <select
+                        value={tag.rootNodeId ?? ''}
+                        onChange={(event) =>
+                          updateTag(tag.id, { rootNodeId: event.target.value || null })
+                        }
+                      >
+                        <option value="">None</option>
+                        {project.nodes
+                          .filter((node) => node.tagIds.includes(tag.id))
+                          .map((node) => (
+                            <option key={node.id} value={node.id}>
+                              {node.name}
+                            </option>
+                          ))}
+                      </select>
                     </div>
                     <div className="tag-stats">
                       <div>
@@ -1156,6 +1210,7 @@ function App() {
                     setProject(SAMPLE_DATA)
                     setSelectedNodeId(null)
                     setIsNodeEditorOpen(false)
+                    setShowRootNodesOnly(false)
                   }}
                 >
                   Reset to Sample
@@ -1174,6 +1229,17 @@ function App() {
                 <option value="list">List view</option>
               </select>
             </label>
+            {viewMode !== 'list' && (
+              <label className="theme-switcher">
+                Root Only
+                <input
+                  className="compact-check"
+                  type="checkbox"
+                  checked={showRootNodesOnly}
+                  onChange={(event) => setShowRootNodesOnly(event.target.checked)}
+                />
+              </label>
+            )}
             <button onClick={addNode}>Add</button>
           </div>
         </section>

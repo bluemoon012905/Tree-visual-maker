@@ -320,6 +320,19 @@ button.danger {
   margin-top: 8px;
 }
 
+.tag-root-row {
+  margin-top: 6px;
+  align-items: center;
+}
+
+.compact-check {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+  border-radius: 4px;
+}
+
 .edge-row {
   display: grid;
   grid-template-columns: minmax(150px, 1fr) auto auto;

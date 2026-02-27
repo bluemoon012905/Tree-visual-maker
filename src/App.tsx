@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 
 type EdgeType = 'next' | 'previous' | 'undirected'
@@ -59,6 +59,7 @@ type ThemeMode = 'light' | 'turtle-night'
 type ViewMode = 'graph' | 'graph3d' | 'list'
 type CollapsibleSection = 'project' | 'tags' | 'stats'
 type PositionedNode3D = PositionedNode & { z: number }
+type ViewportState = { scale: number; tx: number; ty: number }
 
 const WIDTH = 980
 const HEIGHT = 680
@@ -623,10 +624,125 @@ function project3D(x: number, y: number, z: number) {
   }
 }
 
+function segmentsIntersect(
+  a1: { x: number; y: number },
+  a2: { x: number; y: number },
+  b1: { x: number; y: number },
+  b2: { x: number; y: number },
+) {
+  const orient = (p: { x: number; y: number }, q: { x: number; y: number }, r: { x: number; y: number }) =>
+    (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y)
+
+  const o1 = orient(a1, a2, b1)
+  const o2 = orient(a1, a2, b2)
+  const o3 = orient(b1, b2, a1)
+  const o4 = orient(b1, b2, a2)
+  return o1 * o2 < 0 && o3 * o4 < 0
+}
+
+function untangleLayout(initial: PositionedNode[], edges: EdgeData[]) {
+  if (initial.length === 0) {
+    return []
+  }
+
+  const state = initial.map((item) => ({
+    node: item.node,
+    x: item.x,
+    y: item.y,
+    vx: 0,
+    vy: 0,
+  }))
+  const byId = new Map(state.map((item) => [item.node.id, item]))
+
+  for (let step = 0; step < 120; step += 1) {
+    for (const item of state) {
+      item.vx *= 0.86
+      item.vy *= 0.86
+      item.vx += (WIDTH / 2 - item.x) * 0.0008
+      item.vy += (HEIGHT / 2 - item.y) * 0.0008
+    }
+
+    for (let i = 0; i < state.length; i += 1) {
+      for (let j = i + 1; j < state.length; j += 1) {
+        const a = state[i]
+        const b = state[j]
+        const dx = b.x - a.x
+        const dy = b.y - a.y
+        const distSq = dx * dx + dy * dy + 0.01
+        const dist = Math.sqrt(distSq)
+        const repulse = 6200 / distSq
+        const rx = (dx / dist) * repulse
+        const ry = (dy / dist) * repulse
+        a.vx -= rx
+        a.vy -= ry
+        b.vx += rx
+        b.vy += ry
+      }
+    }
+
+    for (const edge of edges) {
+      const from = byId.get(edge.from)
+      const to = byId.get(edge.to)
+      if (!from || !to) continue
+      const dx = to.x - from.x
+      const dy = to.y - from.y
+      const dist = Math.sqrt(dx * dx + dy * dy) + 0.01
+      const targetDist = 165
+      const spring = (dist - targetDist) * 0.015
+      const sx = (dx / dist) * spring
+      const sy = (dy / dist) * spring
+      from.vx += sx
+      from.vy += sy
+      to.vx -= sx
+      to.vy -= sy
+    }
+
+    for (let i = 0; i < edges.length; i += 1) {
+      for (let j = i + 1; j < edges.length; j += 1) {
+        const e1 = edges[i]
+        const e2 = edges[j]
+        if (
+          e1.from === e2.from ||
+          e1.from === e2.to ||
+          e1.to === e2.from ||
+          e1.to === e2.to
+        ) {
+          continue
+        }
+        const a1 = byId.get(e1.from)
+        const a2 = byId.get(e1.to)
+        const b1 = byId.get(e2.from)
+        const b2 = byId.get(e2.to)
+        if (!a1 || !a2 || !b1 || !b2) continue
+
+        if (segmentsIntersect(a1, a2, b1, b2)) {
+          a1.vx -= 1.5
+          a1.vy -= 1.5
+          a2.vx += 1.5
+          a2.vy += 1.5
+          b1.vx += 1.5
+          b1.vy -= 1.5
+          b2.vx -= 1.5
+          b2.vy += 1.5
+        }
+      }
+    }
+
+    for (const item of state) {
+      item.x = Math.max(45, Math.min(WIDTH - 45, item.x + item.vx))
+      item.y = Math.max(45, Math.min(HEIGHT - 45, item.y + item.vy))
+    }
+  }
+
+  return state.map((item) => ({ node: item.node, x: item.x, y: item.y }))
+}
+
 function App() {
   const [theme, setTheme] = useState<ThemeMode>('turtle-night')
   const [viewMode, setViewMode] = useState<ViewMode>('graph')
   const [sidebarWidth, setSidebarWidth] = useState(430)
+  const [viewport, setViewport] = useState<ViewportState>({ scale: 1, tx: 0, ty: 0 })
+  const [manualNodePositions, setManualNodePositions] = useState<Record<string, { x: number; y: number }>>({})
   const [project, setProject] = useState<ProjectData>(SAMPLE_DATA)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [isNodeEditorOpen, setIsNodeEditorOpen] = useState(false)
@@ -689,15 +805,23 @@ function App() {
     () => computeLayout(visibleNodes, visibleEdges),
     [visibleNodes, visibleEdges],
   )
+  const interactivePositions = useMemo(
+    () =>
+      positions.map((item) => {
+        const override = manualNodePositions[item.node.id]
+        return override ? { ...item, ...override } : item
+      }),
+    [manualNodePositions, positions],
+  )
   const positions3D = useMemo<PositionedNode3D[]>(
     () =>
-      positions
+      interactivePositions
         .map((item) => ({
           ...item,
           z: hashToUnit(`${item.node.id}:z`) * 2 - 1,
         }))
         .sort((a, b) => a.z - b.z),
-    [positions],
+    [interactivePositions],
   )
 
   const selectedNode = useMemo(
@@ -713,13 +837,22 @@ function App() {
 
   const nodesById = useMemo(() => new Map(project.nodes.map((node) => [node.id, node])), [project.nodes])
   const tagById = useMemo(() => new Map(project.tags.map((tag) => [tag.id, tag])), [project.tags])
-  const positionedById = useMemo(() => new Map(positions.map((item) => [item.node.id, item])), [positions])
+  const positionedById = useMemo(
+    () => new Map(interactivePositions.map((item) => [item.node.id, item])),
+    [interactivePositions],
+  )
   const positioned3DById = useMemo(
     () => new Map(positions3D.map((item) => [item.node.id, item])),
     [positions3D],
   )
 
   const hoveredNode = hover ? nodesById.get(hover.nodeId) ?? null : null
+  const svgRef = useRef<SVGSVGElement | null>(null)
+  const dragNodeIdRef = useRef<string | null>(null)
+  const dragNodeOffsetRef = useRef({ x: 0, y: 0 })
+  const isPanningRef = useRef(false)
+  const panStartRef = useRef<{ x: number; y: number } | null>(null)
+  const movedDuringDragRef = useRef(false)
   const statStyleMap = useMemo(
     () => new Map(project.statStyles.map((style) => [`${style.kind}:${style.key}`, style.color])),
     [project.statStyles],
@@ -765,6 +898,104 @@ function App() {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
   }, [theme])
+
+  useEffect(() => {
+    const endInteractions = () => {
+      dragNodeIdRef.current = null
+      isPanningRef.current = false
+      panStartRef.current = null
+      movedDuringDragRef.current = false
+    }
+    window.addEventListener('mouseup', endInteractions)
+    return () => window.removeEventListener('mouseup', endInteractions)
+  }, [])
+
+  function clientToSvgPoint(clientX: number, clientY: number) {
+    const svg = svgRef.current
+    if (!svg) return null
+    const rect = svg.getBoundingClientRect()
+    const x = ((clientX - rect.left) / rect.width) * WIDTH
+    const y = ((clientY - rect.top) / rect.height) * HEIGHT
+    return { x, y }
+  }
+
+  function clientToWorld(clientX: number, clientY: number) {
+    const point = clientToSvgPoint(clientX, clientY)
+    if (!point) return null
+    return {
+      x: (point.x - viewport.tx) / viewport.scale,
+      y: (point.y - viewport.ty) / viewport.scale,
+    }
+  }
+
+  function beginNodeDrag(nodeId: string, clientX: number, clientY: number) {
+    const point = clientToWorld(clientX, clientY)
+    const positioned = positionedById.get(nodeId)
+    if (!point || !positioned) {
+      return
+    }
+    dragNodeIdRef.current = nodeId
+    dragNodeOffsetRef.current = { x: point.x - positioned.x, y: point.y - positioned.y }
+    movedDuringDragRef.current = false
+  }
+
+  function handleGraphMouseDown(clientX: number, clientY: number) {
+    isPanningRef.current = true
+    panStartRef.current = { x: clientX, y: clientY }
+    movedDuringDragRef.current = false
+  }
+
+  function handleGraphMouseMove(clientX: number, clientY: number) {
+    if (dragNodeIdRef.current) {
+      const point = clientToWorld(clientX, clientY)
+      if (!point) return
+      movedDuringDragRef.current = true
+      setManualNodePositions((current) => ({
+        ...current,
+        [dragNodeIdRef.current!]: {
+          x: Math.max(45, Math.min(WIDTH - 45, point.x - dragNodeOffsetRef.current.x)),
+          y: Math.max(45, Math.min(HEIGHT - 45, point.y - dragNodeOffsetRef.current.y)),
+        },
+      }))
+      return
+    }
+
+    if (isPanningRef.current && panStartRef.current) {
+      const svg = svgRef.current
+      if (!svg) return
+      const rect = svg.getBoundingClientRect()
+      const dx = ((clientX - panStartRef.current.x) / rect.width) * WIDTH
+      const dy = ((clientY - panStartRef.current.y) / rect.height) * HEIGHT
+      if (Math.abs(dx) + Math.abs(dy) > 0.01) {
+        movedDuringDragRef.current = true
+      }
+      panStartRef.current = { x: clientX, y: clientY }
+      setViewport((current) => ({ ...current, tx: current.tx + dx, ty: current.ty + dy }))
+    }
+  }
+
+  function handleGraphWheel(clientX: number, clientY: number, deltaY: number) {
+    const point = clientToSvgPoint(clientX, clientY)
+    if (!point) return
+    setViewport((current) => {
+      const nextScale = Math.max(0.45, Math.min(3.2, current.scale * (deltaY > 0 ? 0.92 : 1.08)))
+      const worldX = (point.x - current.tx) / current.scale
+      const worldY = (point.y - current.ty) / current.scale
+      return {
+        scale: nextScale,
+        tx: point.x - worldX * nextScale,
+        ty: point.y - worldY * nextScale,
+      }
+    })
+  }
+
+  function untangleCurrentView() {
+    const untangled = untangleLayout(interactivePositions, visibleEdges)
+    setManualNodePositions((current) => ({
+      ...current,
+      ...Object.fromEntries(untangled.map((item) => [item.node.id, { x: item.x, y: item.y }])),
+    }))
+  }
 
   function toggleSection(section: CollapsibleSection) {
     setCollapsedSections((current) => ({
@@ -1135,6 +1366,8 @@ function App() {
       const normalized = normalizeProject(parsed)
       setProject(normalized)
       setSelectedNodeId(normalized.nodes[0]?.id ?? null)
+      setManualNodePositions({})
+      setViewport({ scale: 1, tx: 0, ty: 0 })
     } catch {
       alert('Failed to import JSON. Check file format.')
     }
@@ -1145,6 +1378,8 @@ function App() {
     setSelectedNodeId(null)
     setIsNodeEditorOpen(false)
     setShowRootNodesOnly(false)
+    setManualNodePositions({})
+    setViewport({ scale: 1, tx: 0, ty: 0 })
   }
 
   return (
@@ -1623,6 +1858,12 @@ function App() {
                 />
               </label>
             )}
+            {viewMode !== 'list' && <button onClick={untangleCurrentView}>Untangle</button>}
+            {viewMode !== 'list' && (
+              <button className="secondary" onClick={() => setViewport({ scale: 1, tx: 0, ty: 0 })}>
+                Reset View
+              </button>
+            )}
             <label className="theme-switcher">
               Left Width
               <input
@@ -1640,7 +1881,18 @@ function App() {
 
         {viewMode === 'graph' ? (
           <section className="graph-shell">
-            <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="Skill tree graph">
+            <svg
+              ref={svgRef}
+              viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+              role="img"
+              aria-label="Skill tree graph"
+              onMouseDown={(event) => handleGraphMouseDown(event.clientX, event.clientY)}
+              onMouseMove={(event) => handleGraphMouseMove(event.clientX, event.clientY)}
+              onWheel={(event) => {
+                event.preventDefault()
+                handleGraphWheel(event.clientX, event.clientY, event.deltaY)
+              }}
+            >
               <defs>
                 <marker
                   id="arrow-next"
@@ -1664,83 +1916,95 @@ function App() {
                 </marker>
               </defs>
 
-              {visibleEdges.map((edge) => {
-                const from = positionedById.get(edge.from)
-                const to = positionedById.get(edge.to)
-                if (!from || !to) {
-                  return null
-                }
+              <g transform={`translate(${viewport.tx}, ${viewport.ty}) scale(${viewport.scale})`}>
+                {visibleEdges.map((edge) => {
+                  const from = positionedById.get(edge.from)
+                  const to = positionedById.get(edge.to)
+                  if (!from || !to) {
+                    return null
+                  }
 
-                return (
-                  <line
-                    key={edge.id}
-                    x1={from.x}
-                    y1={from.y}
-                    x2={to.x}
-                    y2={to.y}
-                    stroke={edgeColor(edge.type)}
-                    strokeWidth={2.3}
-                    strokeDasharray={edge.type === 'undirected' ? '7 5' : undefined}
-                    markerEnd={
-                      edge.type === 'next'
-                        ? 'url(#arrow-next)'
-                        : edge.type === 'previous'
-                          ? 'url(#arrow-previous)'
-                          : undefined
-                    }
-                  />
-                )
-              })}
-
-              {positions.map(({ node, x, y }) => {
-                const visibleTags = node.tagIds
-                  .map((id) => tagById.get(id))
-                  .filter((tag): tag is Tag => {
-                    if (!tag) return false
-                    return tag.visible
-                  })
-
-                return (
-                  <g
-                    key={node.id}
-                    transform={`translate(${x}, ${y})`}
-                    onMouseMove={(event) =>
-                      setHover({
-                        nodeId: node.id,
-                        x: event.clientX,
-                        y: event.clientY,
-                      })
-                    }
-                    onMouseEnter={(event) =>
-                      setHover({
-                        nodeId: node.id,
-                        x: event.clientX,
-                        y: event.clientY,
-                      })
-                    }
-                    onMouseLeave={() =>
-                      setHover((current) => (current?.nodeId === node.id ? null : current))
-                    }
-                    onClick={() => openNodeEditor(node.id)}
-                  >
-                    <circle
-                      r={NODE_RADIUS}
-                      fill={selectedNodeId === node.id ? 'var(--node-selected)' : 'var(--node-fill)'}
-                      stroke={visibleTags[0]?.color ?? '#5b6f8a'}
-                      strokeWidth={selectedNodeId === node.id ? 4 : 3}
-                      className="node-circle"
+                  return (
+                    <line
+                      key={edge.id}
+                      x1={from.x}
+                      y1={from.y}
+                      x2={to.x}
+                      y2={to.y}
+                      stroke={edgeColor(edge.type)}
+                      strokeWidth={2.3}
+                      strokeDasharray={edge.type === 'undirected' ? '7 5' : undefined}
+                      markerEnd={
+                        edge.type === 'next'
+                          ? 'url(#arrow-next)'
+                          : edge.type === 'previous'
+                            ? 'url(#arrow-previous)'
+                            : undefined
+                      }
                     />
-                    <text
-                      className="node-text"
-                      textAnchor="middle"
-                      y={NODE_TEXT_Y}
-                      style={{ fontSize: `${NODE_FONT_SIZE}px` }}
+                  )
+                })}
+
+                {interactivePositions.map(({ node, x, y }) => {
+                  const visibleTags = node.tagIds
+                    .map((id) => tagById.get(id))
+                    .filter((tag): tag is Tag => {
+                      if (!tag) return false
+                      return tag.visible
+                    })
+
+                  return (
+                    <g
+                      key={node.id}
+                      transform={`translate(${x}, ${y})`}
+                      onMouseDown={(event) => {
+                        event.stopPropagation()
+                        beginNodeDrag(node.id, event.clientX, event.clientY)
+                      }}
+                      onMouseMove={(event) =>
+                        setHover({
+                          nodeId: node.id,
+                          x: event.clientX,
+                          y: event.clientY,
+                        })
+                      }
+                      onMouseEnter={(event) =>
+                        setHover({
+                          nodeId: node.id,
+                          x: event.clientX,
+                          y: event.clientY,
+                        })
+                      }
+                      onMouseLeave={() =>
+                        setHover((current) => (current?.nodeId === node.id ? null : current))
+                      }
+                      onClick={() => {
+                        if (movedDuringDragRef.current) {
+                          movedDuringDragRef.current = false
+                          return
+                        }
+                        openNodeEditor(node.id)
+                      }}
                     >
-                      {node.name.slice(0, 13)}
-                    </text>
-                  </g>
-                )
-              })}
+                      <circle
+                        r={NODE_RADIUS}
+                        fill={selectedNodeId === node.id ? 'var(--node-selected)' : 'var(--node-fill)'}
+                        stroke={visibleTags[0]?.color ?? '#5b6f8a'}
+                        strokeWidth={selectedNodeId === node.id ? 4 : 3}
+                        className="node-circle"
+                      />
+                      <text
+                        className="node-text"
+                        textAnchor="middle"
+                        y={NODE_TEXT_Y}
+                        style={{ fontSize: `${NODE_FONT_SIZE}px` }}
+                      >
+                        {node.name.slice(0, 13)}
+                      </text>
+                    </g>
+                  )
+                })}
+              </g>
             </svg>
 
             {hoveredNode && hover && (
@@ -1770,7 +2034,18 @@ function App() {
           </section>
         ) : viewMode === 'graph3d' ? (
           <section className="graph-shell">
-            <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="Skill tree 3D graph">
+            <svg
+              ref={svgRef}
+              viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+              role="img"
+              aria-label="Skill tree 3D graph"
+              onMouseDown={(event) => handleGraphMouseDown(event.clientX, event.clientY)}
+              onMouseMove={(event) => handleGraphMouseMove(event.clientX, event.clientY)}
+              onWheel={(event) => {
+                event.preventDefault()
+                handleGraphWheel(event.clientX, event.clientY, event.deltaY)
+              }}
+            >
               <defs>
                 <marker
                   id="arrow-next"
@@ -1794,96 +2069,108 @@ function App() {
                 </marker>
               </defs>
 
-              {visibleEdges.map((edge) => {
-                const from = positioned3DById.get(edge.from)
-                const to = positioned3DById.get(edge.to)
-                if (!from || !to) {
-                  return null
-                }
+              <g transform={`translate(${viewport.tx}, ${viewport.ty}) scale(${viewport.scale})`}>
+                {visibleEdges.map((edge) => {
+                  const from = positioned3DById.get(edge.from)
+                  const to = positioned3DById.get(edge.to)
+                  if (!from || !to) {
+                    return null
+                  }
 
-                const fromPoint = project3D(from.x, from.y, from.z)
-                const toPoint = project3D(to.x, to.y, to.z)
-                const edgeDepth = (from.z + to.z) / 2
-                const depthVisibility = (edgeDepth + 1) / 2
+                  const fromPoint = project3D(from.x, from.y, from.z)
+                  const toPoint = project3D(to.x, to.y, to.z)
+                  const edgeDepth = (from.z + to.z) / 2
+                  const depthVisibility = (edgeDepth + 1) / 2
 
-                return (
-                  <line
-                    key={edge.id}
-                    x1={fromPoint.x}
-                    y1={fromPoint.y}
-                    x2={toPoint.x}
-                    y2={toPoint.y}
-                    stroke={edgeColor(edge.type)}
-                    strokeOpacity={0.32 + depthVisibility * 0.58}
-                    strokeWidth={1.2 + depthVisibility * 2}
-                    strokeDasharray={edge.type === 'undirected' ? '7 5' : undefined}
-                    markerEnd={
-                      edge.type === 'next'
-                        ? 'url(#arrow-next)'
-                        : edge.type === 'previous'
-                          ? 'url(#arrow-previous)'
-                          : undefined
-                    }
-                  />
-                )
-              })}
-
-              {positions3D.map(({ node, x, y, z }) => {
-                const visibleTags = node.tagIds
-                  .map((id) => tagById.get(id))
-                  .filter((tag): tag is Tag => {
-                    if (!tag) return false
-                    return tag.visible
-                  })
-                const point = project3D(x, y, z)
-                const depthVisibility = (z + 1) / 2
-                const radius = NODE_RADIUS * point.scale
-
-                return (
-                  <g
-                    key={node.id}
-                    transform={`translate(${point.x}, ${point.y})`}
-                    onMouseMove={(event) =>
-                      setHover({
-                        nodeId: node.id,
-                        x: event.clientX,
-                        y: event.clientY,
-                      })
-                    }
-                    onMouseEnter={(event) =>
-                      setHover({
-                        nodeId: node.id,
-                        x: event.clientX,
-                        y: event.clientY,
-                      })
-                    }
-                    onMouseLeave={() =>
-                      setHover((current) => (current?.nodeId === node.id ? null : current))
-                    }
-                    onClick={() => openNodeEditor(node.id)}
-                  >
-                    <circle
-                      r={radius}
-                      fill={selectedNodeId === node.id ? 'var(--node-selected)' : 'var(--node-fill)'}
-                      fillOpacity={0.64 + depthVisibility * 0.36}
-                      stroke={visibleTags[0]?.color ?? '#5b6f8a'}
-                      strokeWidth={(selectedNodeId === node.id ? 4 : 3) * point.scale}
-                      className="node-circle"
+                  return (
+                    <line
+                      key={edge.id}
+                      x1={fromPoint.x}
+                      y1={fromPoint.y}
+                      x2={toPoint.x}
+                      y2={toPoint.y}
+                      stroke={edgeColor(edge.type)}
+                      strokeOpacity={0.32 + depthVisibility * 0.58}
+                      strokeWidth={1.2 + depthVisibility * 2}
+                      strokeDasharray={edge.type === 'undirected' ? '7 5' : undefined}
+                      markerEnd={
+                        edge.type === 'next'
+                          ? 'url(#arrow-next)'
+                          : edge.type === 'previous'
+                            ? 'url(#arrow-previous)'
+                            : undefined
+                      }
                     />
-                    <text
-                      className="node-text"
-                      textAnchor="middle"
-                      y={NODE_TEXT_Y * point.scale}
-                      style={{
-                        fontSize: `${Math.max(8, NODE_FONT_SIZE * point.scale)}px`,
-                        opacity: 0.62 + depthVisibility * 0.38,
+                  )
+                })}
+
+                {positions3D.map(({ node, x, y, z }) => {
+                  const visibleTags = node.tagIds
+                    .map((id) => tagById.get(id))
+                    .filter((tag): tag is Tag => {
+                      if (!tag) return false
+                      return tag.visible
+                    })
+                  const point = project3D(x, y, z)
+                  const depthVisibility = (z + 1) / 2
+                  const radius = NODE_RADIUS * point.scale
+
+                  return (
+                    <g
+                      key={node.id}
+                      transform={`translate(${point.x}, ${point.y})`}
+                      onMouseDown={(event) => {
+                        event.stopPropagation()
+                        beginNodeDrag(node.id, event.clientX, event.clientY)
+                      }}
+                      onMouseMove={(event) =>
+                        setHover({
+                          nodeId: node.id,
+                          x: event.clientX,
+                          y: event.clientY,
+                        })
+                      }
+                      onMouseEnter={(event) =>
+                        setHover({
+                          nodeId: node.id,
+                          x: event.clientX,
+                          y: event.clientY,
+                        })
+                      }
+                      onMouseLeave={() =>
+                        setHover((current) => (current?.nodeId === node.id ? null : current))
+                      }
+                      onClick={() => {
+                        if (movedDuringDragRef.current) {
+                          movedDuringDragRef.current = false
+                          return
+                        }
+                        openNodeEditor(node.id)
                       }}
                     >
-                      {node.name.slice(0, 13)}
-                    </text>
-                  </g>
-                )
-              })}
+                      <circle
+                        r={radius}
+                        fill={selectedNodeId === node.id ? 'var(--node-selected)' : 'var(--node-fill)'}
+                        fillOpacity={0.64 + depthVisibility * 0.36}
+                        stroke={visibleTags[0]?.color ?? '#5b6f8a'}
+                        strokeWidth={(selectedNodeId === node.id ? 4 : 3) * point.scale}
+                        className="node-circle"
+                      />
+                      <text
+                        className="node-text"
+                        textAnchor="middle"
+                        y={NODE_TEXT_Y * point.scale}
+                        style={{
+                          fontSize: `${Math.max(8, NODE_FONT_SIZE * point.scale)}px`,
+                          opacity: 0.62 + depthVisibility * 0.38,
+                        }}
+                      >
+                        {node.name.slice(0, 13)}
+                      </text>
+                    </g>
+                  )
+                })}
+              </g>
             </svg>
 
             {hoveredNode && hover && (

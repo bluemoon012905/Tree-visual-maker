@@ -137,7 +137,7 @@ button.danger {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 1px;
+  margin-bottom: 5px;
 }
 
 .panel-head-actions {

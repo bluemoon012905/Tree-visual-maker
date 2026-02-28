@@ -57,22 +57,22 @@
 }
 
 :root[data-theme='inoffensive-lightmod'] {
-  --bg: #e8decd;
-  --panel: #f5ecdd;
+  --bg: #e2d3bb;
+  --panel: #f0e1cb;
   --text: #121212;
   --muted: #4b443a;
-  --line: #b9ae9b;
+  --line: #b4a489;
   --brand: #748f75;
   --brand-text: #0f1a0f;
-  --field-bg: #f7efe2;
-  --graph-bg: #f2e8d8;
-  --node-fill: #f8f0e3;
-  --node-selected: #f3e4cb;
+  --field-bg: #f2e6d3;
+  --graph-bg: #ecdcc3;
+  --node-fill: #f3e6d2;
+  --node-selected: #ead5b2;
   --node-text: #151515;
   --tooltip-bg: #1f1b16;
   --tooltip-text: #f8f2e7;
-  --bg-grad-1: #dfd0b8;
-  --bg-grad-2: #e5d7c1;
+  --bg-grad-1: #d8c3a4;
+  --bg-grad-2: #ddc9ab;
   --danger: #8d1f1f;
   --danger-border: #c69292;
   --secondary-bg: #b7c7ae;

@@ -2045,7 +2045,9 @@ function App() {
                 }
               />
             </label>
-            <button onClick={addNode}>Add</button>
+            <button className="add-node-btn" onClick={addNode}>
+              Add Node
+            </button>
           </div>
         </section>
 

@@ -22,8 +22,8 @@
   --secondary-border: #b9cbe4;
   --secondary-active: #dce9fb;
   --secondary-active-border: #7fa0d3;
-  --important-bg: #cf4128;
-  --important-border: #a3311f;
+  --important-bg: #c53a8d;
+  --important-border: #9c2d70;
   --important-text: #ffffff;
 }
 
@@ -51,9 +51,9 @@
   --secondary-border: #4b6886;
   --secondary-active: #25537c;
   --secondary-active-border: #87a792;
-  --important-bg: #d96245;
-  --important-border: #b44d35;
-  --important-text: #fff9f7;
+  --important-bg: #20a7a1;
+  --important-border: #178681;
+  --important-text: #062a28;
 }
 
 :root[data-theme='inoffensive-lightmod'] {

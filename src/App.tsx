@@ -802,6 +802,114 @@ function segmentsIntersect(
   return o1 * o2 < 0 && o3 * o4 < 0
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value))
+}
+
+function distancePointToSegment(
+  point: { x: number; y: number },
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+) {
+  const abx = b.x - a.x
+  const aby = b.y - a.y
+  const abLenSq = abx * abx + aby * aby
+  if (abLenSq < 0.0001) {
+    const dx = point.x - a.x
+    const dy = point.y - a.y
+    return Math.sqrt(dx * dx + dy * dy)
+  }
+  const apx = point.x - a.x
+  const apy = point.y - a.y
+  const t = clamp((apx * abx + apy * aby) / abLenSq, 0, 1)
+  const closestX = a.x + abx * t
+  const closestY = a.y + aby * t
+  const dx = point.x - closestX
+  const dy = point.y - closestY
+  return Math.sqrt(dx * dx + dy * dy)
+}
+
+function layoutPenalty(state: Array<{ node: NodeData; x: number; y: number }>, edges: EdgeData[]) {
+  const byId = new Map(state.map((item) => [item.node.id, item]))
+  let score = 0
+
+  const minNodeDist = NODE_RADIUS * 2 + 12
+  for (let i = 0; i < state.length; i += 1) {
+    for (let j = i + 1; j < state.length; j += 1) {
+      const a = state[i]
+      const b = state[j]
+      const dx = b.x - a.x
+      const dy = b.y - a.y
+      const dist = Math.sqrt(dx * dx + dy * dy) + 0.001
+      if (dist < minNodeDist) {
+        const overlap = minNodeDist - dist
+        score += overlap * overlap * 12
+      }
+    }
+  }
+
+  const nodeEdgeClearance = NODE_RADIUS + 10
+  for (const edge of edges) {
+    const from = byId.get(edge.from)
+    const to = byId.get(edge.to)
+    if (!from || !to) {
+      continue
+    }
+    for (const node of state) {
+      if (node.node.id === edge.from || node.node.id === edge.to) {
+        continue
+      }
+      const dist = distancePointToSegment(node, from, to)
+      if (dist < nodeEdgeClearance) {
+        const overlap = nodeEdgeClearance - dist
+        score += overlap * overlap * 24
+      }
+    }
+  }
+
+  for (let i = 0; i < edges.length; i += 1) {
+    for (let j = i + 1; j < edges.length; j += 1) {
+      const e1 = edges[i]
+      const e2 = edges[j]
+      if (e1.from === e2.from || e1.from === e2.to || e1.to === e2.from || e1.to === e2.to) {
+        continue
+      }
+      const a1 = byId.get(e1.from)
+      const a2 = byId.get(e1.to)
+      const b1 = byId.get(e2.from)
+      const b2 = byId.get(e2.to)
+      if (!a1 || !a2 || !b1 || !b2) {
+        continue
+      }
+      if (segmentsIntersect(a1, a2, b1, b2)) {
+        score += 360
+      }
+    }
+  }
+
+  for (const edge of edges) {
+    const from = byId.get(edge.from)
+    const to = byId.get(edge.to)
+    if (!from || !to) {
+      continue
+    }
+    const dx = to.x - from.x
+    const dy = to.y - from.y
+    const dist = Math.sqrt(dx * dx + dy * dy)
+    score += Math.abs(dist - 180) * 0.14
+  }
+
+  const margin = NODE_RADIUS + 8
+  for (const node of state) {
+    if (node.x < margin) score += (margin - node.x) * (margin - node.x) * 0.8
+    if (node.x > WIDTH - margin) score += (node.x - (WIDTH - margin)) * (node.x - (WIDTH - margin)) * 0.8
+    if (node.y < margin) score += (margin - node.y) * (margin - node.y) * 0.8
+    if (node.y > HEIGHT - margin) score += (node.y - (HEIGHT - margin)) * (node.y - (HEIGHT - margin)) * 0.8
+  }
+
+  return score
+}
+
 function untangleLayout(initial: PositionedNode[], edges: EdgeData[]) {
   if (initial.length === 0) {
     return []
@@ -815,13 +923,16 @@ function untangleLayout(initial: PositionedNode[], edges: EdgeData[]) {
     vy: 0,
   }))
   const byId = new Map(state.map((item) => [item.node.id, item]))
+  const min = NODE_RADIUS + 4
+  const maxX = WIDTH - min
+  const maxY = HEIGHT - min
 
-  for (let step = 0; step < 120; step += 1) {
+  for (let step = 0; step < 220; step += 1) {
     for (const item of state) {
-      item.vx *= 0.86
-      item.vy *= 0.86
-      item.vx += (WIDTH / 2 - item.x) * 0.0008
-      item.vy += (HEIGHT / 2 - item.y) * 0.0008
+      item.vx *= 0.82
+      item.vy *= 0.82
+      item.vx += (WIDTH / 2 - item.x) * 0.0007
+      item.vy += (HEIGHT / 2 - item.y) * 0.0007
     }
 
     for (let i = 0; i < state.length; i += 1) {
@@ -832,7 +943,7 @@ function untangleLayout(initial: PositionedNode[], edges: EdgeData[]) {
         const dy = b.y - a.y
         const distSq = dx * dx + dy * dy + 0.01
         const dist = Math.sqrt(distSq)
-        const repulse = 6200 / distSq
+        const repulse = dist < NODE_RADIUS * 2 + 14 ? 13000 / distSq : 5200 / distSq
         const rx = (dx / dist) * repulse
         const ry = (dy / dist) * repulse
         a.vx -= rx
@@ -849,8 +960,7 @@ function untangleLayout(initial: PositionedNode[], edges: EdgeData[]) {
       const dx = to.x - from.x
       const dy = to.y - from.y
       const dist = Math.sqrt(dx * dx + dy * dy) + 0.01
-      const targetDist = 165
-      const spring = (dist - targetDist) * 0.015
+      const spring = (dist - 175) * 0.017
       const sx = (dx / dist) * spring
       const sy = (dy / dist) * spring
       from.vx += sx
@@ -859,44 +969,71 @@ function untangleLayout(initial: PositionedNode[], edges: EdgeData[]) {
       to.vy -= sy
     }
 
-    for (let i = 0; i < edges.length; i += 1) {
-      for (let j = i + 1; j < edges.length; j += 1) {
-        const e1 = edges[i]
-        const e2 = edges[j]
-        if (
-          e1.from === e2.from ||
-          e1.from === e2.to ||
-          e1.to === e2.from ||
-          e1.to === e2.to
-        ) {
-          continue
-        }
-        const a1 = byId.get(e1.from)
-        const a2 = byId.get(e1.to)
-        const b1 = byId.get(e2.from)
-        const b2 = byId.get(e2.to)
-        if (!a1 || !a2 || !b1 || !b2) continue
-
-        if (segmentsIntersect(a1, a2, b1, b2)) {
-          a1.vx -= 1.5
-          a1.vy -= 1.5
-          a2.vx += 1.5
-          a2.vy += 1.5
-          b1.vx += 1.5
-          b1.vy -= 1.5
-          b2.vx -= 1.5
-          b2.vy += 1.5
-        }
+    for (const edge of edges) {
+      const from = byId.get(edge.from)
+      const to = byId.get(edge.to)
+      if (!from || !to) continue
+      const midX = (from.x + to.x) / 2
+      const midY = (from.y + to.y) / 2
+      const clearance = NODE_RADIUS + 12
+      for (const node of state) {
+        if (node.node.id === edge.from || node.node.id === edge.to) continue
+        const dist = distancePointToSegment(node, from, to)
+        if (dist >= clearance) continue
+        let pushX = node.x - midX
+        let pushY = node.y - midY
+        const len = Math.sqrt(pushX * pushX + pushY * pushY) + 0.001
+        pushX /= len
+        pushY /= len
+        const push = ((clearance - dist) / clearance) * 2.8
+        node.vx += pushX * push
+        node.vy += pushY * push
       }
     }
 
     for (const item of state) {
-      item.x = Math.max(45, Math.min(WIDTH - 45, item.x + item.vx))
-      item.y = Math.max(45, Math.min(HEIGHT - 45, item.y + item.vy))
+      item.x = clamp(item.x + item.vx, min, maxX)
+      item.y = clamp(item.y + item.vy, min, maxY)
     }
   }
 
-  return state.map((item) => ({ node: item.node, x: item.x, y: item.y }))
+  let currentScore = layoutPenalty(state, edges)
+  let bestScore = currentScore
+  let best = state.map((item) => ({ node: item.node, x: item.x, y: item.y }))
+  const iterations = Math.min(5200, Math.max(1400, state.length * state.length * 14))
+
+  for (let step = 0; step < iterations; step += 1) {
+    const t = step / Math.max(1, iterations - 1)
+    const temperature = 34 * (1 - t) + 0.7 * t
+    const moveScale = Math.max(1.4, 24 * (1 - t) + 2)
+    const idx = Math.floor(Math.random() * state.length)
+    const node = state[idx]
+    const oldX = node.x
+    const oldY = node.y
+
+    const dx = (Math.random() * 2 - 1) * moveScale * temperature * 0.12
+    const dy = (Math.random() * 2 - 1) * moveScale * temperature * 0.12
+    node.x = clamp(node.x + dx, min, maxX)
+    node.y = clamp(node.y + dy, min, maxY)
+
+    const nextScore = layoutPenalty(state, edges)
+    const improved = nextScore <= currentScore
+    const acceptProb = Math.exp((currentScore - nextScore) / Math.max(0.001, temperature))
+    const accepted = improved || Math.random() < acceptProb
+
+    if (accepted) {
+      currentScore = nextScore
+      if (currentScore < bestScore) {
+        bestScore = currentScore
+        best = state.map((item) => ({ node: item.node, x: item.x, y: item.y }))
+      }
+    } else {
+      node.x = oldX
+      node.y = oldY
+    }
+  }
+
+  return best
 }
 
 function App() {

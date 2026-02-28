@@ -59,7 +59,7 @@ type PositionedNode = {
   y: number
 }
 
-type ThemeMode = 'light' | 'turtle-night'
+type ThemeMode = 'light' | 'turtle-night' | 'inoffensive-lightmod'
 type ViewMode = 'graph' | 'list'
 type CollapsibleSection = 'project' | 'tags' | 'stats'
 type ViewportState = { scale: number; tx: number; ty: number }
@@ -2013,6 +2013,7 @@ function App() {
               <select value={theme} onChange={(event) => setTheme(event.target.value as ThemeMode)}>
                 <option value="light">Light</option>
                 <option value="turtle-night">Turtle's night</option>
+                <option value="inoffensive-lightmod">inoffensive lightmod</option>
               </select>
             </label>
           </div>
@@ -2051,7 +2052,9 @@ function App() {
                 <button onClick={() => loadExampleTemplate(STARTER_TEMPLATE)}>
                   Load Starter Template
                 </button>
-                <button onClick={() => loadExampleTemplate(BLANK_PROJECT)}>Start New</button>
+                <button className="important-btn" onClick={() => loadExampleTemplate(BLANK_PROJECT)}>
+                  Start New
+                </button>
               </div>
             )}
           </section>

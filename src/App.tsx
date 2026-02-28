@@ -1029,6 +1029,20 @@ function App() {
     () => new Map(project.statStyles.map((style) => [`${style.kind}:${style.key}`, style.color])),
     [project.statStyles],
   )
+  const quantitativeStatOptions = useMemo(() => {
+    const styleKeys = project.statStyles
+      .filter((style) => style.kind === 'quantitative')
+      .map((style) => style.key)
+    const nodeKeys = selectedNode ? Object.keys(selectedNode.stats.quantitative) : []
+    return [...new Set([...styleKeys, ...nodeKeys])].sort((a, b) => a.localeCompare(b))
+  }, [project.statStyles, selectedNode])
+  const qualitativeStatOptions = useMemo(() => {
+    const styleKeys = project.statStyles
+      .filter((style) => style.kind === 'qualitative')
+      .map((style) => style.key)
+    const nodeKeys = selectedNode ? Object.keys(selectedNode.stats.qualitative) : []
+    return [...new Set([...styleKeys, ...nodeKeys])].sort((a, b) => a.localeCompare(b))
+  }, [project.statStyles, selectedNode])
   const hoveredNodeStatLines = useMemo(() => {
     if (!hoveredNode) {
       return []
@@ -1107,6 +1121,24 @@ function App() {
     window.addEventListener('mouseup', endInteractions)
     return () => window.removeEventListener('mouseup', endInteractions)
   }, [])
+
+  useEffect(() => {
+    setQuantKey((current) => {
+      if (quantitativeStatOptions.length === 0) {
+        return ''
+      }
+      return quantitativeStatOptions.includes(current) ? current : quantitativeStatOptions[0]
+    })
+  }, [quantitativeStatOptions])
+
+  useEffect(() => {
+    setQualKey((current) => {
+      if (qualitativeStatOptions.length === 0) {
+        return ''
+      }
+      return qualitativeStatOptions.includes(current) ? current : qualitativeStatOptions[0]
+    })
+  }, [qualitativeStatOptions])
 
   function clientToSvgPoint(clientX: number, clientY: number) {
     const svg = svgRef.current
@@ -1498,7 +1530,7 @@ function App() {
   }
 
   function addQuantitativeStat() {
-    if (!selectedNode || !quantKey.trim()) {
+    if (!selectedNode || !quantKey) {
       return
     }
     const numeric = Number(quantValue)
@@ -1506,7 +1538,7 @@ function App() {
       return
     }
 
-    const key = quantKey.trim()
+    const key = quantKey
     updateNode(selectedNode.id, {
       stats: {
         ...selectedNode.stats,
@@ -1535,11 +1567,11 @@ function App() {
   }
 
   function addQualitativeStat() {
-    if (!selectedNode || !qualKey.trim() || !qualValue.trim()) {
+    if (!selectedNode || !qualKey || !qualValue.trim()) {
       return
     }
 
-    const key = qualKey.trim()
+    const key = qualKey
     updateNode(selectedNode.id, {
       stats: {
         ...selectedNode.stats,
@@ -1954,11 +1986,18 @@ function App() {
                   )}
                 </div>
                 <div className="row">
-                  <input
-                    placeholder="key"
+                  <select
                     value={quantKey}
+                    disabled={quantitativeStatOptions.length === 0}
                     onChange={(event) => setQuantKey(event.target.value)}
-                  />
+                  >
+                    {quantitativeStatOptions.length === 0 && <option value="">No quant stats defined</option>}
+                    {quantitativeStatOptions.map((key) => (
+                      <option key={key} value={key}>
+                        {key}
+                      </option>
+                    ))}
+                  </select>
                   <input
                     placeholder="value"
                     value={quantValue}
@@ -1986,11 +2025,18 @@ function App() {
                   )}
                 </div>
                 <div className="row">
-                  <input
-                    placeholder="key"
+                  <select
                     value={qualKey}
+                    disabled={qualitativeStatOptions.length === 0}
                     onChange={(event) => setQualKey(event.target.value)}
-                  />
+                  >
+                    {qualitativeStatOptions.length === 0 && <option value="">No qual stats defined</option>}
+                    {qualitativeStatOptions.map((key) => (
+                      <option key={key} value={key}>
+                        {key}
+                      </option>
+                    ))}
+                  </select>
                   <input
                     placeholder="value"
                     value={qualValue}

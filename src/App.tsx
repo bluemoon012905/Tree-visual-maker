@@ -2077,19 +2077,49 @@ function App() {
 
                 <div className="list">
                   {selectedNodeEdges.map((edge) => {
-                    const isOutgoing = edge.from === selectedNode.id
-                    const otherNodeId = isOutgoing ? edge.to : edge.from
+                    const directedFromId = edge.type === 'previous' ? edge.to : edge.from
+                    const directedToId = edge.type === 'previous' ? edge.from : edge.to
+                    const isOutgoing =
+                      edge.type !== 'undirected' && directedFromId === selectedNode.id
+                    const isIncoming =
+                      edge.type !== 'undirected' && directedToId === selectedNode.id
+                    const otherNodeId =
+                      edge.type === 'undirected'
+                        ? edge.from === selectedNode.id
+                          ? edge.to
+                          : edge.from
+                        : isOutgoing
+                          ? directedToId
+                          : directedFromId
                     const otherNodeName = nodesById.get(otherNodeId)?.name ?? otherNodeId
-                    const directionLabel = isOutgoing ? '->' : '<-'
+                    const directionLabel =
+                      edge.type === 'undirected' ? '--' : isOutgoing ? '->' : isIncoming ? '<-' : '--'
+                    const relativeType: EdgeType =
+                      edge.type === 'undirected'
+                        ? 'undirected'
+                        : isOutgoing
+                          ? 'next'
+                          : 'previous'
 
                     return (
                       <div key={edge.id} className="edge-row">
                         <span>{`${directionLabel} ${otherNodeName}`}</span>
                         <select
-                          value={edge.type}
-                          onChange={(event) =>
-                            updateEdge(edge.id, { type: event.target.value as EdgeType })
-                          }
+                          value={relativeType}
+                          onChange={(event) => {
+                            const chosen = event.target.value as EdgeType
+                            if (chosen === 'undirected') {
+                              updateEdge(edge.id, { type: 'undirected' })
+                              return
+                            }
+                            const nextStoredType: EdgeType =
+                              selectedNode.id === edge.from
+                                ? chosen
+                                : chosen === 'next'
+                                  ? 'previous'
+                                  : 'next'
+                            updateEdge(edge.id, { type: nextStoredType })
+                          }}
                         >
                           <option value="next">next</option>
                           <option value="previous">previous</option>
@@ -2345,14 +2375,16 @@ function App() {
                   if (!from || !to) {
                     return null
                   }
+                  const drawFrom = edge.type === 'previous' ? to : from
+                  const drawTo = edge.type === 'previous' ? from : to
 
                   return (
                     <line
                       key={edge.id}
-                      x1={from.x}
-                      y1={from.y}
-                      x2={to.x}
-                      y2={to.y}
+                      x1={drawFrom.x}
+                      y1={drawFrom.y}
+                      x2={drawTo.x}
+                      y2={drawTo.y}
                       stroke={edgeColor(edge.type)}
                       strokeWidth={2.3}
                       strokeDasharray={edge.type === 'undirected' ? '7 5' : undefined}

@@ -69,6 +69,41 @@ const HEIGHT = 680
 const NODE_RADIUS = 26
 const NODE_FONT_SIZE = Math.round(NODE_RADIUS * 0.42)
 const NODE_TEXT_Y = Math.round(NODE_FONT_SIZE * 0.36)
+const ONBOARDING_DONE_KEY = 'tree_visual_onboarding_done'
+
+const ONBOARDING_STEPS = [
+  {
+    title: 'Welcome',
+    lines: [
+      'This app helps you build and visualize skill trees.',
+      'Use the left sidebar for data setup and the top controls for view actions.',
+    ],
+  },
+  {
+    title: 'Panels Overview',
+    lines: [
+      'Project: import/export and templates.',
+      'Tags: create dimensions, set root nodes, and optional tag stat entries.',
+      'Stats: define stat colors used in tooltips.',
+      'Node Editor: edit selected node details, tags, edges, and stats.',
+    ],
+  },
+  {
+    title: 'How To Add',
+    lines: [
+      'Add a tag from the Tags panel using name + color.',
+      'Add a stat color rule in Stats by key and type.',
+      'Add a node with the Add Node button above the visual.',
+    ],
+  },
+  {
+    title: 'Navigation',
+    lines: [
+      'Drag nodes to reposition them. Drag background to pan. Use wheel to zoom.',
+      'Use Untangle and Save Current View to refine and preserve your layout.',
+    ],
+  },
+]
 
 const SAMPLE_DATA: ProjectData = {
   tags: [
@@ -901,6 +936,13 @@ function App() {
     tags: false,
     stats: false,
   })
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    if (typeof window === 'undefined') {
+      return false
+    }
+    return window.localStorage.getItem(ONBOARDING_DONE_KEY) !== 'true'
+  })
+  const [onboardingStep, setOnboardingStep] = useState(0)
 
   const visibleTagIds = useMemo(
     () => new Set(project.tags.filter((tag) => tag.visible).map((tag) => tag.id)),
@@ -1168,6 +1210,27 @@ function App() {
         showRootNodesOnly,
       },
     }))
+  }
+
+  function neverShowOnboardingAgain() {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(ONBOARDING_DONE_KEY, 'true')
+    }
+    setShowOnboarding(false)
+    setOnboardingStep(0)
+  }
+
+  function hideOnboardingForNow() {
+    setShowOnboarding(false)
+    setOnboardingStep(0)
+  }
+
+  function nextOnboardingStep() {
+    if (onboardingStep >= ONBOARDING_STEPS.length - 1) {
+      neverShowOnboardingAgain()
+      return
+    }
+    setOnboardingStep((current) => Math.min(current + 1, ONBOARDING_STEPS.length - 1))
   }
 
   function toggleSection(section: CollapsibleSection) {
@@ -1555,8 +1618,9 @@ function App() {
   }
 
   return (
-    <div className="app" style={{ '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}>
-      <aside className="sidebar">
+    <>
+      <div className="app" style={{ '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}>
+        <aside className="sidebar">
         <section className="panel">
           <div className="panel-head">
             <h2>Tags (Dimensions)</h2>
@@ -2226,8 +2290,42 @@ function App() {
           </section>
         )}
 
-      </main>
-    </div>
+        </main>
+      </div>
+      {showOnboarding && (
+        <div className="onboarding-overlay" role="dialog" aria-modal="true" aria-label="Onboarding">
+          <section className="onboarding-modal">
+            <h2>{ONBOARDING_STEPS[onboardingStep].title}</h2>
+            {ONBOARDING_STEPS[onboardingStep].lines.map((line) => (
+              <p key={line}>{line}</p>
+            ))}
+            <p className="onboarding-progress">
+              Step {onboardingStep + 1} of {ONBOARDING_STEPS.length}
+            </p>
+            <div className="onboarding-actions">
+              <button className="secondary" onClick={hideOnboardingForNow}>
+                Not now
+              </button>
+              <button className="secondary" onClick={neverShowOnboardingAgain}>
+                Never show again
+              </button>
+              <div className="onboarding-nav">
+                <button
+                  className="secondary"
+                  onClick={() => setOnboardingStep((current) => Math.max(current - 1, 0))}
+                  disabled={onboardingStep === 0}
+                >
+                  Back
+                </button>
+                <button onClick={nextOnboardingStep}>
+                  {onboardingStep === ONBOARDING_STEPS.length - 1 ? 'Finish' : 'Next'}
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
+    </>
   )
 }
 

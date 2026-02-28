@@ -24,6 +24,7 @@ type NodeData = {
     quantitative: Record<string, number>
     qualitative: Record<string, string>
   }
+  statOrder?: string[]
   description: string
 }
 
@@ -547,6 +548,50 @@ function edgeColor(type: EdgeType) {
   return '#6f7f90'
 }
 
+function nodeStatId(kind: StatKind, key: string) {
+  return `${kind}:${key}`
+}
+
+function collectNodeStatEntries(node: NodeData) {
+  return [
+    ...Object.entries(node.stats.quantitative).map(([key, value]) => ({
+      id: nodeStatId('quantitative', key),
+      kind: 'quantitative' as const,
+      key,
+      value: String(value),
+    })),
+    ...Object.entries(node.stats.qualitative).map(([key, value]) => ({
+      id: nodeStatId('qualitative', key),
+      kind: 'qualitative' as const,
+      key,
+      value: String(value),
+    })),
+  ]
+}
+
+function orderNodeStatEntries(node: NodeData) {
+  const entries = collectNodeStatEntries(node)
+  const order = node.statOrder ?? []
+  if (entries.length === 0) {
+    return entries
+  }
+  const byId = new Map(entries.map((entry) => [entry.id, entry]))
+  const ordered: typeof entries = []
+  for (const id of order) {
+    const entry = byId.get(id)
+    if (entry) {
+      ordered.push(entry)
+      byId.delete(id)
+    }
+  }
+  for (const entry of entries) {
+    if (byId.has(entry.id)) {
+      ordered.push(entry)
+    }
+  }
+  return ordered
+}
+
 function normalizeProject(input: ProjectData): ProjectData {
   const tags = (input.tags ?? []).map((tag) => {
     const quantitative: Record<string, number> = {}
@@ -592,12 +637,22 @@ function normalizeProject(input: ProjectData): ProjectData {
     }
 
     const validTagIds = (node.tagIds ?? []).filter((id) => tagIds.has(id))
+    const allStatIds = new Set([
+      ...Object.keys(quantitative).map((key) => nodeStatId('quantitative', key)),
+      ...Object.keys(qualitative).map((key) => nodeStatId('qualitative', key)),
+    ])
+    const statOrder = Array.isArray(node.statOrder)
+      ? node.statOrder
+          .map((id) => String(id))
+          .filter((id, index, list) => allStatIds.has(id) && list.indexOf(id) === index)
+      : []
 
     return {
       id: String(node.id ?? createId('node')),
       name: String(node.name ?? 'New Node'),
       tagIds: validTagIds,
       stats: { quantitative, qualitative },
+      statOrder,
       description: String(node.description ?? ''),
     }
   })
@@ -654,24 +709,22 @@ function normalizeProject(input: ProjectData): ProjectData {
 }
 
 function sortProjectForExport(project: ProjectData): ProjectData {
-  const tags = [...project.tags]
-    .sort((a, b) => a.id.localeCompare(b.id))
-    .map((tag) => ({
-      ...tag,
-      stats: {
-        quantitative: Object.fromEntries(
-          Object.entries(tag.stats.quantitative).sort(([a], [b]) => a.localeCompare(b)),
-        ),
-        qualitative: Object.fromEntries(
-          Object.entries(tag.stats.qualitative).sort(([a], [b]) => a.localeCompare(b)),
-        ),
-      },
-    }))
+  const tags = project.tags.map((tag) => ({
+    ...tag,
+    stats: {
+      quantitative: Object.fromEntries(
+        Object.entries(tag.stats.quantitative).sort(([a], [b]) => a.localeCompare(b)),
+      ),
+      qualitative: Object.fromEntries(
+        Object.entries(tag.stats.qualitative).sort(([a], [b]) => a.localeCompare(b)),
+      ),
+    },
+  }))
   const nodes = [...project.nodes]
     .sort((a, b) => a.id.localeCompare(b.id))
     .map((node) => ({
       ...node,
-      tagIds: [...node.tagIds].sort((a, b) => a.localeCompare(b)),
+      tagIds: [...node.tagIds],
       stats: {
         quantitative: Object.fromEntries(
           Object.entries(node.stats.quantitative).sort(([a], [b]) => a.localeCompare(b)),
@@ -680,6 +733,14 @@ function sortProjectForExport(project: ProjectData): ProjectData {
           Object.entries(node.stats.qualitative).sort(([a], [b]) => a.localeCompare(b)),
         ),
       },
+      statOrder: (node.statOrder ?? []).filter((id) => {
+        const [kind, ...rest] = id.split(':')
+        const key = rest.join(':')
+        if (!key || (kind !== 'quantitative' && kind !== 'qualitative')) {
+          return false
+        }
+        return kind === 'quantitative' ? key in node.stats.quantitative : key in node.stats.qualitative
+      }),
     }))
   const edges = [...project.edges].sort((a, b) => a.id.localeCompare(b.id))
   const statStyles = [...project.statStyles].sort((a, b) => a.id.localeCompare(b.id))
@@ -1066,6 +1127,10 @@ function App() {
   const [quantValue, setQuantValue] = useState('')
   const [qualKey, setQualKey] = useState('')
   const [qualValue, setQualValue] = useState('')
+  const [showNodeTagOrder, setShowNodeTagOrder] = useState(false)
+  const [draggingNodeTagId, setDraggingNodeTagId] = useState<string | null>(null)
+  const [draggingGlobalTagId, setDraggingGlobalTagId] = useState<string | null>(null)
+  const [draggingStatId, setDraggingStatId] = useState<string | null>(null)
   const [hover, setHover] = useState<{ nodeId: string; x: number; y: number } | null>(null)
   const [showRootNodesOnly, setShowRootNodesOnly] = useState(false)
   const [collapsedSections, setCollapsedSections] = useState<Record<CollapsibleSection, boolean>>({
@@ -1140,6 +1205,12 @@ function App() {
 
   const nodesById = useMemo(() => new Map(project.nodes.map((node) => [node.id, node])), [project.nodes])
   const tagById = useMemo(() => new Map(project.tags.map((tag) => [tag.id, tag])), [project.tags])
+  const selectedNodeOrderedTags = useMemo(() => {
+    if (!selectedNode) {
+      return []
+    }
+    return selectedNode.tagIds.map((id) => tagById.get(id)).filter((tag): tag is Tag => Boolean(tag))
+  }, [selectedNode, tagById])
   const positionedById = useMemo(
     () => new Map(interactivePositions.map((item) => [item.node.id, item])),
     [interactivePositions],
@@ -1180,22 +1251,19 @@ function App() {
     const nodeKeys = selectedNode ? Object.keys(selectedNode.stats.qualitative) : []
     return [...new Set([...styleKeys, ...nodeKeys])].sort((a, b) => a.localeCompare(b))
   }, [project.statStyles, selectedNode])
+  const selectedNodeStatEntries = useMemo(
+    () => (selectedNode ? orderNodeStatEntries(selectedNode) : []),
+    [selectedNode],
+  )
   const hoveredNodeStatLines = useMemo(() => {
     if (!hoveredNode) {
       return []
     }
-    return [
-      ...Object.entries(hoveredNode.stats.quantitative).map(([key, value]) => ({
-        id: `node:q:${key}`,
-        text: `${key}: ${value}`,
-        color: statStyleMap.get(`quantitative:${key}`),
-      })),
-      ...Object.entries(hoveredNode.stats.qualitative).map(([key, value]) => ({
-        id: `node:s:${key}`,
-        text: `${key}: ${value}`,
-        color: statStyleMap.get(`qualitative:${key}`),
-      })),
-    ]
+    return orderNodeStatEntries(hoveredNode).map((entry) => ({
+      id: `node:${entry.id}`,
+      text: `${entry.key}: ${entry.value}`,
+      color: statStyleMap.get(`${entry.kind}:${entry.key}`),
+    }))
   }, [hoveredNode, statStyleMap])
   const hoveredTagStatLines = useMemo(() => {
     if (!hoveredNode) {
@@ -1276,6 +1344,12 @@ function App() {
       return qualitativeStatOptions.includes(current) ? current : qualitativeStatOptions[0]
     })
   }, [qualitativeStatOptions])
+
+  useEffect(() => {
+    setDraggingStatId(null)
+    setDraggingNodeTagId(null)
+    setShowNodeTagOrder(false)
+  }, [selectedNodeId])
 
   function clientToSvgPoint(clientX: number, clientY: number) {
     const svg = svgRef.current
@@ -1574,6 +1648,7 @@ function App() {
       name: 'New Node',
       tagIds: [],
       stats: { quantitative: {}, qualitative: {} },
+      statOrder: [],
       description: '',
     }
 
@@ -1676,6 +1751,7 @@ function App() {
     }
 
     const key = quantKey
+    const statId = nodeStatId('quantitative', key)
     updateNode(selectedNode.id, {
       stats: {
         ...selectedNode.stats,
@@ -1684,6 +1760,9 @@ function App() {
           [key]: numeric,
         },
       },
+      statOrder: (selectedNode.statOrder ?? []).includes(statId)
+        ? selectedNode.statOrder
+        : [...(selectedNode.statOrder ?? []), statId],
     })
     setQuantKey('')
     setQuantValue('')
@@ -1700,6 +1779,7 @@ function App() {
         ...selectedNode.stats,
         quantitative: next,
       },
+      statOrder: (selectedNode.statOrder ?? []).filter((id) => id !== nodeStatId('quantitative', key)),
     })
   }
 
@@ -1709,6 +1789,7 @@ function App() {
     }
 
     const key = qualKey
+    const statId = nodeStatId('qualitative', key)
     updateNode(selectedNode.id, {
       stats: {
         ...selectedNode.stats,
@@ -1717,6 +1798,9 @@ function App() {
           [key]: qualValue.trim(),
         },
       },
+      statOrder: (selectedNode.statOrder ?? []).includes(statId)
+        ? selectedNode.statOrder
+        : [...(selectedNode.statOrder ?? []), statId],
     })
     setQualKey('')
     setQualValue('')
@@ -1733,6 +1817,55 @@ function App() {
         ...selectedNode.stats,
         qualitative: next,
       },
+      statOrder: (selectedNode.statOrder ?? []).filter((id) => id !== nodeStatId('qualitative', key)),
+    })
+  }
+
+  function reorderSelectedNodeStatOrder(targetStatId: string) {
+    if (!selectedNode || !draggingStatId || draggingStatId === targetStatId) {
+      return
+    }
+    const orderedIds = orderNodeStatEntries(selectedNode).map((entry) => entry.id)
+    if (!orderedIds.includes(draggingStatId) || !orderedIds.includes(targetStatId)) {
+      return
+    }
+    const withoutDragged = orderedIds.filter((id) => id !== draggingStatId)
+    const targetIndex = withoutDragged.indexOf(targetStatId)
+    withoutDragged.splice(targetIndex, 0, draggingStatId)
+    updateNode(selectedNode.id, { statOrder: withoutDragged })
+  }
+
+  function reorderSelectedNodeTags(targetTagId: string) {
+    if (!selectedNode || !draggingNodeTagId || draggingNodeTagId === targetTagId) {
+      return
+    }
+    const orderedIds = selectedNode.tagIds.filter((id) => tagById.has(id))
+    if (!orderedIds.includes(draggingNodeTagId) || !orderedIds.includes(targetTagId)) {
+      return
+    }
+    const withoutDragged = orderedIds.filter((id) => id !== draggingNodeTagId)
+    const targetIndex = withoutDragged.indexOf(targetTagId)
+    withoutDragged.splice(targetIndex, 0, draggingNodeTagId)
+    updateNode(selectedNode.id, { tagIds: withoutDragged })
+  }
+
+  function reorderGlobalTags(targetTagId: string) {
+    if (!draggingGlobalTagId || draggingGlobalTagId === targetTagId) {
+      return
+    }
+    setProject((current) => {
+      const orderedIds = current.tags.map((tag) => tag.id)
+      if (!orderedIds.includes(draggingGlobalTagId) || !orderedIds.includes(targetTagId)) {
+        return current
+      }
+      const withoutDragged = orderedIds.filter((id) => id !== draggingGlobalTagId)
+      const targetIndex = withoutDragged.indexOf(targetTagId)
+      withoutDragged.splice(targetIndex, 0, draggingGlobalTagId)
+      const byId = new Map(current.tags.map((tag) => [tag.id, tag]))
+      return {
+        ...current,
+        tags: withoutDragged.map((id) => byId.get(id)).filter((tag): tag is Tag => Boolean(tag)),
+      }
     })
   }
 
@@ -1825,7 +1958,19 @@ function App() {
 
               <div className="list">
                 {project.tags.map((tag) => (
-                  <div className="tag-item" key={tag.id}>
+                  <div
+                    className={`tag-item draggable-item${draggingGlobalTagId === tag.id ? ' dragging' : ''}`}
+                    key={tag.id}
+                    draggable
+                    onDragStart={() => setDraggingGlobalTagId(tag.id)}
+                    onDragEnd={() => setDraggingGlobalTagId(null)}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={(event) => {
+                      event.preventDefault()
+                      reorderGlobalTags(tag.id)
+                      setDraggingGlobalTagId(null)
+                    }}
+                  >
                     <div className="list-item">
                       <input
                         className="checkbox"
@@ -1849,6 +1994,7 @@ function App() {
                         Delete
                       </button>
                     </div>
+                    <p className="muted reorder-hint">drag to reorder tag panel</p>
                     {showTagStatsInTagsPanel && (
                       <div className="row tag-root-row">
                         <span className="subhead">Root node</span>
@@ -2035,7 +2181,12 @@ function App() {
               </label>
 
               <div>
-                <p className="subhead">Tags</p>
+                <div className="panel-head panel-head-tight">
+                  <p className="subhead">Tags</p>
+                  <button className="secondary" onClick={() => setShowNodeTagOrder((current) => !current)}>
+                    {showNodeTagOrder ? 'Hide Tag Order' : 'Arrange Tags'}
+                  </button>
+                </div>
                 <div className="tag-grid">
                   {project.tags.map((tag) => (
                     <label key={tag.id} className="tag-pill" style={{ borderColor: tag.color }}>
@@ -2049,6 +2200,30 @@ function App() {
                   ))}
                   {project.tags.length === 0 && <p className="empty">Create tags first.</p>}
                 </div>
+                {showNodeTagOrder && (
+                  <div className="list">
+                    {selectedNodeOrderedTags.map((tag) => (
+                      <div
+                        key={tag.id}
+                        className={`edge-row tag-order-row${draggingNodeTagId === tag.id ? ' dragging' : ''}`}
+                        draggable
+                        onDragStart={() => setDraggingNodeTagId(tag.id)}
+                        onDragEnd={() => setDraggingNodeTagId(null)}
+                        onDragOver={(event) => event.preventDefault()}
+                        onDrop={(event) => {
+                          event.preventDefault()
+                          reorderSelectedNodeTags(tag.id)
+                          setDraggingNodeTagId(null)
+                        }}
+                      >
+                        <span>{tag.name}</span>
+                        <span className="tag-color-dot" style={{ background: tag.color }} />
+                        <span className="muted">drag to reorder node tag color priority</span>
+                      </div>
+                    ))}
+                    {selectedNodeOrderedTags.length === 0 && <p className="empty">No tags on this node.</p>}
+                  </div>
+                )}
               </div>
 
               <div>
@@ -2210,6 +2385,31 @@ function App() {
                     onChange={(event) => setQualValue(event.target.value)}
                   />
                   <button onClick={addQualitativeStat}>Add</button>
+                </div>
+              </div>
+
+              <div>
+                <p className="subhead">Stat Display Order</p>
+                <div className="list">
+                  {selectedNodeStatEntries.map((entry) => (
+                    <div
+                      key={entry.id}
+                      className={`edge-row stat-order-row${draggingStatId === entry.id ? ' dragging' : ''}`}
+                      draggable
+                      onDragStart={() => setDraggingStatId(entry.id)}
+                      onDragEnd={() => setDraggingStatId(null)}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={(event) => {
+                        event.preventDefault()
+                        reorderSelectedNodeStatOrder(entry.id)
+                        setDraggingStatId(null)
+                      }}
+                    >
+                      <span>{`${entry.kind}: ${entry.key}`}</span>
+                      <span className="muted">drag to reorder</span>
+                    </div>
+                  ))}
+                  {selectedNodeStatEntries.length === 0 && <p className="empty">No stats to order.</p>}
                 </div>
               </div>
             </>

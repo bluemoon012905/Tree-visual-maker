@@ -376,6 +376,19 @@ button.danger {
   background: var(--field-bg);
 }
 
+.draggable-item {
+  cursor: grab;
+}
+
+.draggable-item.dragging {
+  opacity: 0.65;
+}
+
+.reorder-hint {
+  margin: 6px 0 0;
+  font-size: 0.8rem;
+}
+
 .tag-stats {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -455,6 +468,39 @@ button.danger {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.stat-order-row {
+  grid-template-columns: minmax(150px, 1fr) auto;
+  cursor: grab;
+}
+
+.stat-order-row.dragging {
+  opacity: 0.65;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.panel-head-tight {
+  margin-bottom: 6px;
+}
+
+.panel-head-tight .subhead {
+  margin: 0;
+}
+
+.tag-order-row {
+  grid-template-columns: minmax(120px, 1fr) auto auto;
+  cursor: grab;
+}
+
+.tag-color-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
 }
 
 .empty {

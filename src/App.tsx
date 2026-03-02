@@ -1127,6 +1127,8 @@ function App() {
   const [quantValue, setQuantValue] = useState('')
   const [qualKey, setQualKey] = useState('')
   const [qualValue, setQualValue] = useState('')
+  const [quantEditDrafts, setQuantEditDrafts] = useState<Record<string, { key: string; value: string }>>({})
+  const [qualEditDrafts, setQualEditDrafts] = useState<Record<string, { key: string; value: string }>>({})
   const [showNodeTagOrder, setShowNodeTagOrder] = useState(false)
   const [draggingNodeTagId, setDraggingNodeTagId] = useState<string | null>(null)
   const [draggingGlobalTagId, setDraggingGlobalTagId] = useState<string | null>(null)
@@ -1349,6 +1351,8 @@ function App() {
     setDraggingStatId(null)
     setDraggingNodeTagId(null)
     setShowNodeTagOrder(false)
+    setQuantEditDrafts({})
+    setQualEditDrafts({})
   }, [selectedNodeId])
 
   function clientToSvgPoint(clientX: number, clientY: number) {
@@ -1768,6 +1772,53 @@ function App() {
     setQuantValue('')
   }
 
+  function setQuantEditDraft(
+    sourceKey: string,
+    sourceValue: number,
+    patch: Partial<{ key: string; value: string }>,
+  ) {
+    setQuantEditDrafts((current) => ({
+      ...current,
+      [sourceKey]: {
+        key: current[sourceKey]?.key ?? sourceKey,
+        value: current[sourceKey]?.value ?? String(sourceValue),
+        ...patch,
+      },
+    }))
+  }
+
+  function saveQuantitativeStatEdit(sourceKey: string) {
+    if (!selectedNode) {
+      return
+    }
+    const sourceValue = selectedNode.stats.quantitative[sourceKey]
+    const draft = quantEditDrafts[sourceKey] ?? { key: sourceKey, value: String(sourceValue) }
+    const nextKey = draft.key.trim()
+    const nextValue = Number(draft.value)
+    if (!nextKey || !Number.isFinite(nextValue)) {
+      return
+    }
+
+    const nextQuantitative = { ...selectedNode.stats.quantitative }
+    delete nextQuantitative[sourceKey]
+    nextQuantitative[nextKey] = nextValue
+
+    updateNode(selectedNode.id, {
+      stats: {
+        ...selectedNode.stats,
+        quantitative: nextQuantitative,
+      },
+      statOrder: (selectedNode.statOrder ?? [])
+        .map((id) => (id === nodeStatId('quantitative', sourceKey) ? nodeStatId('quantitative', nextKey) : id))
+        .filter((id, index, list) => list.indexOf(id) === index),
+    })
+    setQuantEditDrafts((current) => {
+      const next = { ...current }
+      delete next[sourceKey]
+      return next
+    })
+  }
+
   function removeQuantitativeStat(key: string) {
     if (!selectedNode) {
       return
@@ -1780,6 +1831,11 @@ function App() {
         quantitative: next,
       },
       statOrder: (selectedNode.statOrder ?? []).filter((id) => id !== nodeStatId('quantitative', key)),
+    })
+    setQuantEditDrafts((current) => {
+      const next = { ...current }
+      delete next[key]
+      return next
     })
   }
 
@@ -1806,6 +1862,52 @@ function App() {
     setQualValue('')
   }
 
+  function setQualEditDraft(
+    sourceKey: string,
+    sourceValue: string,
+    patch: Partial<{ key: string; value: string }>,
+  ) {
+    setQualEditDrafts((current) => ({
+      ...current,
+      [sourceKey]: {
+        key: current[sourceKey]?.key ?? sourceKey,
+        value: current[sourceKey]?.value ?? sourceValue,
+        ...patch,
+      },
+    }))
+  }
+
+  function saveQualitativeStatEdit(sourceKey: string) {
+    if (!selectedNode) {
+      return
+    }
+    const sourceValue = selectedNode.stats.qualitative[sourceKey] ?? ''
+    const draft = qualEditDrafts[sourceKey] ?? { key: sourceKey, value: sourceValue }
+    const nextKey = draft.key.trim()
+    if (!nextKey) {
+      return
+    }
+
+    const nextQualitative = { ...selectedNode.stats.qualitative }
+    delete nextQualitative[sourceKey]
+    nextQualitative[nextKey] = draft.value
+
+    updateNode(selectedNode.id, {
+      stats: {
+        ...selectedNode.stats,
+        qualitative: nextQualitative,
+      },
+      statOrder: (selectedNode.statOrder ?? [])
+        .map((id) => (id === nodeStatId('qualitative', sourceKey) ? nodeStatId('qualitative', nextKey) : id))
+        .filter((id, index, list) => list.indexOf(id) === index),
+    })
+    setQualEditDrafts((current) => {
+      const next = { ...current }
+      delete next[sourceKey]
+      return next
+    })
+  }
+
   function removeQualitativeStat(key: string) {
     if (!selectedNode) {
       return
@@ -1818,6 +1920,11 @@ function App() {
         qualitative: next,
       },
       statOrder: (selectedNode.statOrder ?? []).filter((id) => id !== nodeStatId('qualitative', key)),
+    })
+    setQualEditDrafts((current) => {
+      const next = { ...current }
+      delete next[key]
+      return next
     })
   }
 
@@ -2156,9 +2263,14 @@ function App() {
           <section className="panel node-editor">
             <div className="panel-head">
               <h2>Node Editor</h2>
-              <button className="secondary" onClick={() => setIsNodeEditorOpen(false)}>
-                Close
-              </button>
+              <div className="panel-head-actions">
+                <button className="danger" onClick={() => deleteNode(selectedNode.id)}>
+                  Delete Node
+                </button>
+                <button className="secondary" onClick={() => setIsNodeEditorOpen(false)}>
+                  Close
+                </button>
+              </div>
             </div>
             <>
               <label>
@@ -2315,9 +2427,21 @@ function App() {
                 <div className="stat-list">
                   {Object.entries(selectedNode.stats.quantitative).map(([key, value]) => (
                     <div className="stat-row" key={key}>
-                      <span>
-                        {key}: {value}
-                      </span>
+                      <input
+                        value={quantEditDrafts[key]?.key ?? key}
+                        onChange={(event) =>
+                          setQuantEditDraft(key, value, { key: event.target.value })
+                        }
+                      />
+                      <input
+                        value={quantEditDrafts[key]?.value ?? String(value)}
+                        onChange={(event) =>
+                          setQuantEditDraft(key, value, { value: event.target.value })
+                        }
+                      />
+                      <button className="secondary" onClick={() => saveQuantitativeStatEdit(key)}>
+                        Save
+                      </button>
                       <button className="danger" onClick={() => removeQuantitativeStat(key)}>
                         Remove
                       </button>
@@ -2354,9 +2478,21 @@ function App() {
                 <div className="stat-list">
                   {Object.entries(selectedNode.stats.qualitative).map(([key, value]) => (
                     <div className="stat-row" key={key}>
-                      <span>
-                        {key}: {value}
-                      </span>
+                      <input
+                        value={qualEditDrafts[key]?.key ?? key}
+                        onChange={(event) =>
+                          setQualEditDraft(key, value, { key: event.target.value })
+                        }
+                      />
+                      <input
+                        value={qualEditDrafts[key]?.value ?? value}
+                        onChange={(event) =>
+                          setQualEditDraft(key, value, { value: event.target.value })
+                        }
+                      />
+                      <button className="secondary" onClick={() => saveQualitativeStatEdit(key)}>
+                        Save
+                      </button>
                       <button className="danger" onClick={() => removeQualitativeStat(key)}>
                         Remove
                       </button>

@@ -1661,6 +1661,49 @@ function App() {
     setIsNodeEditorOpen(true)
   }
 
+  function copyNodeAsNext() {
+    if (!selectedNode) {
+      return
+    }
+
+    const createdNode: NodeData = {
+      id: createId('node'),
+      name: `${selectedNode.name} copy`,
+      tagIds: [...selectedNode.tagIds],
+      stats: {
+        quantitative: { ...selectedNode.stats.quantitative },
+        qualitative: { ...selectedNode.stats.qualitative },
+      },
+      statOrder: [...(selectedNode.statOrder ?? [])],
+      description: selectedNode.description,
+    }
+    const createdEdge: EdgeData = {
+      id: createId('edge'),
+      from: selectedNode.id,
+      to: createdNode.id,
+      type: 'next',
+    }
+
+    const selectedPosition = manualNodePositions[selectedNode.id] ?? positionedById.get(selectedNode.id)
+    if (selectedPosition) {
+      setManualNodePositions((current) => ({
+        ...current,
+        [createdNode.id]: {
+          x: Math.max(45, Math.min(WIDTH - 45, selectedPosition.x + 90)),
+          y: Math.max(45, Math.min(HEIGHT - 45, selectedPosition.y + 30)),
+        },
+      }))
+    }
+
+    setProject((current) => ({
+      ...current,
+      nodes: [...current.nodes, createdNode],
+      edges: [...current.edges, createdEdge],
+    }))
+    setSelectedNodeId(createdNode.id)
+    setIsNodeEditorOpen(true)
+  }
+
   function updateNode(nodeId: string, patch: Partial<NodeData>) {
     setProject((current) => ({
       ...current,
@@ -2264,6 +2307,9 @@ function App() {
             <div className="panel-head">
               <h2>Node Editor</h2>
               <div className="panel-head-actions">
+                <button className="secondary" onClick={copyNodeAsNext}>
+                  Copy as next
+                </button>
                 <button className="danger" onClick={() => deleteNode(selectedNode.id)}>
                   Delete Node
                 </button>
